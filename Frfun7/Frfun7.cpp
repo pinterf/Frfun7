@@ -3,6 +3,7 @@
 #include "Frfun7.h"
 
 #include <math.h>
+#include <algorithm>
 
 // trash 2,3 result in 2
 #define sad16(offset, rdst, rdp, rsad, rtmp)		\
@@ -1394,8 +1395,8 @@ PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
         {
           frcore_sad_b4_mmx(cpln(sx, sy), ppln(sx, sy), &devp);
           frcore_sad_b4_mmx(cpln(sx, sy), npln(sx, sy), &devn);
-          dev = min(dev, devn);
-          dev = min(dev, devp);
+          dev = std::min(dev, devn);
+          dev = std::min(dev, devp);
         }
 
         int thresh = ((dev * lambda) >> 10);
