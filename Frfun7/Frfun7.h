@@ -30,22 +30,22 @@
 
 #define uint8_t unsigned char
 
-class AvsFilter : public GenericVideoFilter 
+class AvsFilter : public GenericVideoFilter
 {
-	int lastn;
-	PVideoFrame pf,cf;
+  int lastn;
+  PVideoFrame pf, cf;
 
-	int inv_table[1024];
-	int lambda,T,Tuv;
-	int P;
-	Plane8i wpln;
+  int inv_table[1024];
+  int lambda, T, Tuv;
+  int P;
+  Plane8i wpln;
 public:
-	AvsFilter(AVSValue args, IScriptEnvironment* env);
-    PVideoFrame __stdcall GetFrame(int n, IScriptEnvironment* env);
-	static AVSValue __cdecl Create(AVSValue args, void* user_data, IScriptEnvironment* env);
-	~AvsFilter();
+  AvsFilter(AVSValue args, IScriptEnvironment* env);
+  PVideoFrame __stdcall GetFrame(int n, IScriptEnvironment* env);
+  static AVSValue __cdecl Create(AVSValue args, void* user_data, IScriptEnvironment* env);
+  ~AvsFilter();
 };
 
-extern "C" __declspec(dllexport) const char* __stdcall AvisynthPluginInit2(IScriptEnvironment* env);
+extern "C" __declspec(dllexport) const char* __stdcall AvisynthPluginInit2(IScriptEnvironment * env);
 
 #endif /* __AVSFILTER_H__ */
