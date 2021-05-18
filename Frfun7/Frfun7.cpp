@@ -1358,7 +1358,7 @@ PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
   */
 
   for (int pl = pla; pl < plb; pl++) {	// PLANES LOOP
-    int x, y, plane = (pl == 0) ? (PLANAR_Y) : ((pl == 1) ? (PLANAR_U) : (PLANAR_V));
+    int x, y, plane = pl == 0 ? PLANAR_Y : (pl == 1 ? PLANAR_U : PLANAR_V);
     Vect dim = GetAVSDim(cf, plane);
     Plane8i ppln = ImportAVSRead(&pf, plane);
     Plane8i cpln = ImportAVSRead(&cf, plane);
@@ -1389,9 +1389,7 @@ PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
         int dev, devp, devn;
         frcore_dev_b4_mmx(cpln(sx, sy), &dev);
 
-        //	P &= ~2;
-
-        if ((P & 2))
+        if ((P & 2)) // 2: temporal
         {
           frcore_sad_b4_mmx(cpln(sx, sy), ppln(sx, sy), &devp);
           frcore_sad_b4_mmx(cpln(sx, sy), npln(sx, sy), &devn);
@@ -1404,17 +1402,18 @@ PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
         if (thresh < 1) thresh = 1;
 
         int weight;
-        if ((P & 2))
+        if ((P & 2)) // 2: temporal
           frcore_filter_b4r0_mmx(cpln(bx, by), cpln(bx, by), dpln(bx, by), thresh, inv_table, &weight);
         else
         {
-          if (sx == x && sy == y && (P & 4))
+          // not temporal
+          if (sx == x && sy == y && (P & 4)) // 4: adaptive radius
             frcore_filter_adapt_b4r3_mmx(cpln(bx, by), cpln(sx, sy), dpln(bx, by), thresh, 16 * 9, 16 * 25, inv_table, &weight);
-          else
+          else // Nothing;  adaptive overlapping (&1) ; some case of adaptive radius (4)
             frcore_filter_b4r3_mmx(cpln(bx, by), cpln(sx, sy), dpln(bx, by), thresh, inv_table, &weight);
         }
 
-        if ((P & 2))
+        if ((P & 2)) // 2: temporal
         {
           int k = 1;
           if (devp < thresh)
@@ -1433,7 +1432,7 @@ PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
       }
     }
 
-    if ((P & 1))
+    if ((P & 1)) // 1: adaptive overlapping
       for (y = 2; y < dim.y - B; y += S)
       {
         int tmax = T;
@@ -1465,7 +1464,7 @@ PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
 
 
     int k, kk;
-    if ((P & 1))
+    if ((P & 1)) // 1: adaptive overlapping
       for (kk = 1; kk < 9; kk++)
       {
         k = kk;
@@ -1515,21 +1514,18 @@ AvsFilter::AvsFilter(AVSValue args, IScriptEnvironment* env)
 {
   lastn = -2;
 
-  lambda = (int)(args[1].AsFloat(1.1) * 1024);
+  lambda = (int)(args[1].AsFloat(1.1) * 1024); // 10 bit integer arithmetic
   T = (int)(args[2].AsFloat(6) * 16);
   Tuv = (int)(args[3].AsFloat(2) * 16);
 
   P = args[4].AsInt(0);
-  //	P = 12*1000;
 
+  // for adaptive overlapping: a number*1000 makes a weight threshold (?)
+  //	P = 12*1000;
   //	P &= ~7;
   //	P |= 1;		// adaptive overlapping
   //	P |= 2;		// temporal
   //	P |= 4;		// adaptive radius
-
-
-  //	P = 12*1000+2;
-  //	P |= 2;
 
   wpln = Plane8i().alloc(vi.width / 4, vi.height / 4);
   for (int i = 1; i < 1024; i++) inv_table[i] = (int)((1 << 15) / (double)i);
@@ -1553,6 +1549,7 @@ extern "C" __declspec(dllexport) const char* __stdcall
 AvisynthPluginInit3(IScriptEnvironment * env, const AVS_Linkage* const vectors) {
 
   AVS_linkage = vectors;
+  // this P parameter did not exist in rev6 but appeared in a build in 2013
   env->AddFunction("frfun7", "c[lambda]f[T]f[Tuv]f[P]i", AvsFilter::Create, 0);
   //    env->AddFunction("frfun7", "c[lambda]f[T]f[Tuv]f", AvsFilter::Create, 0);
   return "`x' xxx";

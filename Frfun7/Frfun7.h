@@ -1,6 +1,7 @@
 //
-//	PostProc (version x.x) - Avisynth filter 
-//	Copyright (C) 2002 Marc Fauconneau
+//  Frfun7 - Avisynth filter 
+//  Copyright (C) 2006, 2013 Marc Fauconneau
+//            (C) 2021 Ferenc Pintér
 //
 //  This program is free software; you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
@@ -15,18 +16,13 @@
 //  You should have received a copy of the GNU General Public License
 //  along with this program; if not, write to the Free Software
 //  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
-//
-//  Please contact me for any bugs or questions.
-//  marc.fd@libertysurf.fr
-
-//  Change log :
-//         20/07/2002 - ver x.x  - Avisynth filter coded (from scratch)
 
 #ifndef __FRFUN7_H__
 #define __FRFUN7_H__
 
 #include "avisynth.h"
 #include "avs/alignment.h"
+#include "stdint.h"
 
 struct Vect {
   int x, y;
@@ -130,10 +126,6 @@ Plane8i ImportAVSWrite(PVideoFrame* f, int plane)
 {
   return Plane8i(f, plane, false);
 }
-
-
-
-#define uint8_t unsigned char
 
 class AvsFilter : public GenericVideoFilter
 {
