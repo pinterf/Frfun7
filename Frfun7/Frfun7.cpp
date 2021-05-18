@@ -1,6 +1,6 @@
 
 #include "avisynth.h"
-#include "avsfilter.h"
+#include "Frfun7.h"
 
 #include <math.h>
 
@@ -1541,7 +1541,14 @@ AVSValue __cdecl AvsFilter::Create(AVSValue args, void* user_data, IScriptEnviro
   return new AvsFilter(args, env);
 }
 
-extern "C" __declspec(dllexport) const char* __stdcall AvisynthPluginInit2(IScriptEnvironment * env) {
+// Declare and initialise server pointers static storage.
+const AVS_Linkage* AVS_linkage = 0;
+
+// DLL entry point called from LoadPlugin() to setup a user plugin.
+extern "C" __declspec(dllexport) const char* __stdcall
+AvisynthPluginInit3(IScriptEnvironment * env, const AVS_Linkage* const vectors) {
+
+  AVS_linkage = vectors;
   env->AddFunction("frfun7", "c[lambda]f[T]f[Tuv]f[P]i", AvsFilter::Create, 0);
   //    env->AddFunction("frfun7", "c[lambda]f[T]f[Tuv]f", AvsFilter::Create, 0);
   return "`x' xxx";

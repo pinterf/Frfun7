@@ -22,8 +22,8 @@
 //  Change log :
 //         20/07/2002 - ver x.x  - Avisynth filter coded (from scratch)
 
-#ifndef __AVSFILTER_H__
-#define __AVSFILTER_H__
+#ifndef __FRFUN7_H__
+#define __FRFUN7_H__
 
 #include "avisynth.h"
 #include "..\(image lib)\image.h"
@@ -46,6 +46,4 @@ public:
   ~AvsFilter();
 };
 
-extern "C" __declspec(dllexport) const char* __stdcall AvisynthPluginInit2(IScriptEnvironment * env);
-
-#endif /* __AVSFILTER_H__ */
+#endif /* __FRFUN7_H__ */
