@@ -1359,10 +1359,10 @@ PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
   for (int pl = pla; pl < plb; pl++) {	// PLANES LOOP
     int x, y, plane = (pl == 0) ? (PLANAR_Y) : ((pl == 1) ? (PLANAR_U) : (PLANAR_V));
     Vect dim = GetAVSDim(cf, plane);
-    Plane8i ppln = ImportAVSRead(pf, plane);
-    Plane8i cpln = ImportAVSRead(cf, plane);
-    Plane8i npln = ImportAVSRead(nf, plane);
-    Plane8i dpln = ImportAVSWrite(df, plane);
+    Plane8i ppln = ImportAVSRead(&pf, plane);
+    Plane8i cpln = ImportAVSRead(&cf, plane);
+    Plane8i npln = ImportAVSRead(&nf, plane);
+    Plane8i dpln = ImportAVSWrite(&df, plane);
 
     int R = 3;
     int B = 4;
@@ -1457,7 +1457,8 @@ PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
           int weight = get_weight(1);
           frcore_filter_diff_b4r1_mmx(cpln(x, y), cpln(sx, sy), dpln(x, y), thresh, inv_table, &weight);
 
-          *wpln(x / 4, y / 4) = clipb(weight);
+          unsigned char* wpln_ptr = wpln.get_ptr(x / 4, y / 4);
+          *wpln_ptr = clipb(weight);
         }
       }
 
@@ -1483,7 +1484,9 @@ PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
             if (sx > dim.x - R - B) sx = dim.x - R - B;
             if (sy > dim.y - R - B) sy = dim.y - R - B;
 
-            if (*wpln(x / 4, y / 4) < P / 1000) continue;
+            unsigned char* wpln_ptr = wpln.get_ptr(x / 4, y / 4);
+
+            if (*wpln_ptr < P / 1000) continue;
 
             int dev = 10;
             frcore_dev_b4_mmx(cpln(sx, sy), &dev);
