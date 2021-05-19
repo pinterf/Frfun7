@@ -1332,8 +1332,8 @@ int get_weight(int alpha)
 PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
 {
   //	if (n<1 || n>vi.num_frames-1) return child->GetFrame(n, env);
-  if (!pf || lastn + 1 != n) pf = child->GetFrame(n - 1, env);
-  if (!cf || lastn + 1 != n) cf = child->GetFrame(n, env);
+  PVideoFrame pf = child->GetFrame(n - 1, env);
+  PVideoFrame cf = child->GetFrame(n, env);
   PVideoFrame nf = child->GetFrame(n + 1, env);
   PVideoFrame df = env->NewVideoFrame(vi);
 
@@ -1512,8 +1512,6 @@ PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
 AvsFilter::AvsFilter(AVSValue args, IScriptEnvironment* env)
   : GenericVideoFilter(args[0].AsClip())
 {
-  lastn = -2;
-
   lambda = (int)(args[1].AsFloat(1.1) * 1024); // 10 bit integer arithmetic
   T = (int)(args[2].AsFloat(6) * 16);
   Tuv = (int)(args[3].AsFloat(2) * 16);

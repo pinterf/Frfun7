@@ -137,9 +137,6 @@ Plane8i ImportAVSWrite(PVideoFrame* f, int plane)
 
 class AvsFilter : public GenericVideoFilter
 {
-  int lastn;
-  PVideoFrame pf, cf;
-
   int inv_table[1024];
   int lambda, T, Tuv;
   int P;
