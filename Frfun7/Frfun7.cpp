@@ -1,4 +1,3 @@
-
 #include "avisynth.h"
 #include "Frfun7.h"
 
@@ -97,19 +96,13 @@ __asm				psrlw	mm1,1				\
 __asm				packuswb mm1,mm2			\
 __asm				movd	[esi],mm1
 
-void frcore_filter_b4r3_mmx(Plane8i rpln, Plane8i cpln, Plane8i dpln, int T, int* inv_table, int* weight)
+void frcore_filter_b4r3_mmx(const uint8_t* ptrr, int pitchr, const uint8_t* ptra, int pitcha, uint8_t* ptrb, int pitchb, int T, int* inv_table, int* weight)
 {
-
-  uint8_t* ptrr = rpln.ptr;
-  uint8_t* ptra = cpln(-3, -3).ptr;
-  uint8_t* ptrb = dpln.ptr;
+  ptra += -3 * pitcha - 3; // cpln(-3, -3)
 
   int* _weight = weight;
   int* _inv_table = inv_table;
   int _thresh = T;
-  int pitchr = rpln.stride;
-  int pitcha = cpln.stride;
-  int pitchb = dpln.stride;
 
   __asm
   {
@@ -247,21 +240,16 @@ void frcore_filter_b4r3_mmx(Plane8i rpln, Plane8i cpln, Plane8i dpln, int T, int
   }
 }
 
-void frcore_filter_adapt_b4r3_mmx(Plane8i rpln, Plane8i cpln, Plane8i dpln, int T, int sT2, int sT3, int* inv_table, int* weight)
+void frcore_filter_adapt_b4r3_mmx(const uint8_t* ptrr, int pitchr, const uint8_t* ptra, int pitcha, uint8_t* ptrb, int pitchb, int T, int sT2, int sT3, int* inv_table, int* weight)
 {
 
-  uint8_t* ptrr = rpln.ptr;
-  uint8_t* ptra = cpln(-3, -1).ptr;
-  uint8_t* ptrb = dpln.ptr;
+  ptra += -1 * pitcha - 3; // cpln(-3, -1)
 
   int* _weight = weight;
   int* _inv_table = inv_table;
   int _thresh = T;
   int _thresh2 = sT2;
   int _thresh3 = sT3;
-  int pitchr = rpln.stride;
-  int pitcha = cpln.stride;
-  int pitchb = dpln.stride;
 
   __asm
   {
@@ -439,19 +427,14 @@ void frcore_filter_adapt_b4r3_mmx(Plane8i rpln, Plane8i cpln, Plane8i dpln, int 
   }
 }
 
-void frcore_filter_b4r0_mmx(Plane8i rpln, Plane8i cpln, Plane8i dpln, int T, int* inv_table, int* weight)
+void frcore_filter_b4r0_mmx(const uint8_t* ptrr, int pitchr, const uint8_t* ptra, int pitcha, uint8_t* ptrb, int pitchb, int T, int* inv_table, int* weight)
 {
 
-  uint8_t* ptrr = rpln.ptr;
-  uint8_t* ptra = cpln(-0, -0).ptr;
-  uint8_t* ptrb = dpln.ptr;
+  // ptra no change // cpln(-0, -0)
 
   int* _weight = weight;
   int* _inv_table = inv_table;
   int _thresh = T;
-  int pitchr = rpln.stride;
-  int pitcha = cpln.stride;
-  int pitchb = dpln.stride;
 
   __asm
   {
@@ -534,16 +517,6 @@ __asm			psrlw	mmA, 5					\
 __asm			packuswb mmA, mm0				\
 __asm			movd	[esi], mmA
 
-#define	__blend_store4(mmA)						\
-__asm			movd	mm3, [esi]				\
-__asm			punpcklbw mm3, mm0				\
-__asm			paddw	mmA, mm3				\
-__asm			paddw	mmA, mm1				\
-__asm			psrlw	mmA, 1					\
-__asm			packuswb mmA, mm0				\
-__asm			movd	[esi], mmA
-
-
 #define expand_word(mmA,mmB)				\
 __asm			movq	mmB, mmA			\
 __asm			psllq	mmA, 32				\
@@ -553,19 +526,14 @@ __asm			psllq	mmB, 16				\
 __asm			por		mmA, mmB
 
 
-void frcore_filter_overlap_b4r3_mmx(Plane8i rpln, Plane8i cpln, Plane8i dpln, int T, int* inv_table, int* weight)
+void frcore_filter_overlap_b4r3_mmx(const uint8_t* ptrr, int pitchr, const uint8_t* ptra, int pitcha, uint8_t* ptrb, int pitchb, int T, int* inv_table, int* weight)
 {
 
-  uint8_t* ptrr = rpln.ptr;
-  uint8_t* ptra = cpln(-3, -3).ptr;
-  uint8_t* ptrb = dpln.ptr;
+  ptra += -3 * pitcha - 3; // cpln(-3, -3)
 
   int* _weight = weight;
   int* _inv_table = inv_table;
   int _thresh = T;
-  int pitchr = rpln.stride;
-  int pitcha = cpln.stride;
-  int pitchb = dpln.stride;
 
   __asm
   {
@@ -726,19 +694,14 @@ void frcore_filter_overlap_b4r3_mmx(Plane8i rpln, Plane8i cpln, Plane8i dpln, in
   }
 }
 
-void frcore_filter_overlap_b4r2_mmx(Plane8i rpln, Plane8i cpln, Plane8i dpln, int T, int* inv_table, int* weight)
+void frcore_filter_overlap_b4r2_mmx(const uint8_t* ptrr, int pitchr, const uint8_t* ptra, int pitcha, uint8_t* ptrb, int pitchb, int T, int* inv_table, int* weight)
 {
 
-  uint8_t* ptrr = rpln.ptr;
-  uint8_t* ptra = cpln(-2, -2).ptr;
-  uint8_t* ptrb = dpln.ptr;
+  ptra += -2 * pitcha - 2; // cpln(-2, -2)
 
   int* _weight = weight;
   int* _inv_table = inv_table;
   int _thresh = T;
-  int pitchr = rpln.stride;
-  int pitcha = cpln.stride;
-  int pitchb = dpln.stride;
 
   __asm
   {
@@ -869,19 +832,14 @@ void frcore_filter_overlap_b4r2_mmx(Plane8i rpln, Plane8i cpln, Plane8i dpln, in
   }
 }
 
-void frcore_filter_overlap_b4r0_mmx(Plane8i rpln, Plane8i cpln, Plane8i dpln, int T, int* inv_table, int* weight)
+void frcore_filter_overlap_b4r0_mmx(const uint8_t* ptrr, int pitchr, const uint8_t* ptra, int pitcha, uint8_t* ptrb, int pitchb, int T, int* inv_table, int* weight)
 {
 
-  uint8_t* ptrr = rpln.ptr;
-  uint8_t* ptra = cpln(0, 0).ptr;
-  uint8_t* ptrb = dpln.ptr;
+  // ptra no change // cpln(0, 0)
 
   int* _weight = weight;
   int* _inv_table = inv_table;
   int _thresh = T;
-  int pitchr = rpln.stride;
-  int pitcha = cpln.stride;
-  int pitchb = dpln.stride;
 
   __asm
   {
@@ -989,19 +947,14 @@ __asm			movd	mm3, [esi]				\
 __asm			psadbw	mmA, mm3
 
 
-void frcore_filter_diff_b4r1_mmx(Plane8i rpln, Plane8i cpln, Plane8i dpln, int T, int* inv_table, int* weight)
+void frcore_filter_diff_b4r1_mmx(const uint8_t* ptrr, int pitchr, const uint8_t* ptra, int pitcha, uint8_t* ptrb, int pitchb, int T, int* inv_table, int* weight)
 {
 
-  uint8_t* ptrr = rpln.ptr;
-  uint8_t* ptra = cpln(-1, -1).ptr;
-  uint8_t* ptrb = dpln.ptr;
+  ptra += -1 * pitcha - 1; //  cpln(-1, -1)
 
   int* _weight = weight;
   int* _inv_table = inv_table;
   int _thresh = T;
-  int pitchr = rpln.stride;
-  int pitcha = cpln.stride;
-  int pitchb = dpln.stride;
 
   __asm
   {
@@ -1117,18 +1070,20 @@ void frcore_filter_diff_b4r1_mmx(Plane8i rpln, Plane8i cpln, Plane8i dpln, int T
   }
 }
 
-void frcore_filter_b4r2_mmx(Plane8i rpln, Plane8i cpln, Plane8i dpln, int T, int* inv_table)
+#if 0
+// not used
+void frcore_filter_b4r2_mmx(Plane8i rpln, Plane8i cpln, uint8_t* dstp, int dstp_pitch, int T, int* inv_table)
 {
 
   uint8_t* ptrr = rpln.ptr;
   uint8_t* ptra = cpln(-2, -2).ptr;
-  uint8_t* ptrb = dpln.ptr;
+  uint8_t* ptrb = dstp;
 
   int* _inv_table = inv_table;
   int _thresh = T;
   int pitchr = rpln.stride;
   int pitcha = cpln.stride;
-  int pitchb = dpln.stride;
+  int pitchb = dstp_pitch;
 
   __asm
   {
@@ -1247,12 +1202,13 @@ void frcore_filter_b4r2_mmx(Plane8i rpln, Plane8i cpln, Plane8i dpln, int T, int
     pop ebx; safety^^
   }
 }
+#endif
 
-void frcore_dev_b4_mmx(Plane8i cpln, int* dev)
+void frcore_dev_b4_mmx(const uint8_t* srcp, int src_pitch, int* dev)
 {
 
-  uint8_t* ptra = cpln(-1, 0).ptr;
-  int pitcha = cpln.stride;
+  const uint8_t* ptra = srcp - 1; //  cpln(-1, 0).ptr;
+  int pitcha = src_pitch;
   int* _dev = dev;
 
   __asm
@@ -1285,13 +1241,8 @@ void frcore_dev_b4_mmx(Plane8i cpln, int* dev)
   }
 }
 
-void frcore_sad_b4_mmx(Plane8i apln, Plane8i bpln, int* sad)
+void frcore_sad_b4_mmx(const uint8_t* ptra, int pitcha, const uint8_t* ptrb, int pitchb, int* sad)
 {
-
-  uint8_t* ptra = apln(0, 0).ptr;
-  int pitcha = apln.stride;
-  uint8_t* ptrb = bpln(0, 0).ptr;
-  int pitchb = bpln.stride;
   int* _sad = sad;
 
   __asm
@@ -1329,70 +1280,96 @@ int get_weight(int alpha)
   return (a << 16) | b;
 }
 
+int clipb(int weight) {
+  return weight < 0 ? 0 : weight > 255 ? 255 : weight;
+}
+
 PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
 {
+  const bool mode_adaptive_overlapping = P & 1;
+  const bool mode_temporal = P & 2;
+  const bool mode_adaptive_radius = P & 4;
+
+  // fixme: why was it uncommented?
   //	if (n<1 || n>vi.num_frames-1) return child->GetFrame(n, env);
-  PVideoFrame pf = child->GetFrame(n - 1, env);
+
+  PVideoFrame pf; // previous
+  PVideoFrame nf; // next
+
   PVideoFrame cf = child->GetFrame(n, env);
-  PVideoFrame nf = child->GetFrame(n + 1, env);
-  PVideoFrame df = env->NewVideoFrame(vi);
 
-  int pla = 0, plb = 3;
-  /*	if (T==0)
-    {
-      pla = 1;
-      int pl = PLANAR_Y;
-      env->BitBlt(df->GetWritePtr(pl),df->GetPitch(pl),cf->GetReadPtr(pl),cf->GetPitch(pl),
-        df->GetRowSize(pl),df->GetHeight(pl));
-    }
-    if (Tuv==0)
-    {
-      plb = 1;
-      int pl = PLANAR_U;
-      env->BitBlt(df->GetWritePtr(pl),df->GetPitch(pl),cf->GetReadPtr(pl),cf->GetPitch(pl),
-        df->GetRowSize(pl),df->GetHeight(pl));
-      pl = PLANAR_V;
-      env->BitBlt(df->GetWritePtr(pl),df->GetPitch(pl),cf->GetReadPtr(pl),cf->GetPitch(pl),
-        df->GetRowSize(pl),df->GetHeight(pl));
-    }
-  */
+  if (mode_temporal) {
+    pf = child->GetFrame(n - 1, env);
+    nf = child->GetFrame(n + 1, env);
+  }
+  PVideoFrame df = env->NewVideoFrame(vi); // destination
 
-  for (int pl = pla; pl < plb; pl++) {	// PLANES LOOP
-    int x, y, plane = pl == 0 ? PLANAR_Y : (pl == 1 ? PLANAR_U : PLANAR_V);
-    Vect dim = GetAVSDim(cf, plane);
-    Plane8i ppln = ImportAVSRead(&pf, plane);
-    Plane8i cpln = ImportAVSRead(&cf, plane);
-    Plane8i npln = ImportAVSRead(&nf, plane);
-    Plane8i dpln = ImportAVSWrite(&df, plane);
+  const int num_of_planes = std::min(vi.NumComponents(), 3);
+  for (int pl = 0; pl < num_of_planes; pl++) { // PLANES LOOP
+    const int plane = pl == 0 ? PLANAR_Y : (pl == 1 ? PLANAR_U : PLANAR_V);
+
+    const int dim_x = cf->GetRowSize(plane);
+    const int dim_y = cf->GetHeight(plane);;
+
+    // prev/next: only for temporal
+    const uint8_t* srcp_prev_orig = nullptr;
+    const uint8_t* srcp_next_orig = nullptr;
+    int src_prev_pitch;
+    int src_next_pitch;
+
+    if (mode_temporal) {
+      srcp_prev_orig = pf->GetReadPtr(plane);
+      src_prev_pitch = pf->GetPitch(plane);
+
+      srcp_next_orig = nf->GetReadPtr(plane);
+      src_next_pitch = nf->GetPitch(plane);
+    }
+
+    const uint8_t* srcp_orig = cf->GetReadPtr(plane);
+    const int src_pitch = cf->GetPitch(plane);
+
+    uint8_t* dstp_orig = df->GetWritePtr(plane);
+    const int dstp_pitch = df->GetPitch(plane);
+
+    int tmax = Thresh_luma;
+    if (pl > 0) tmax = Thresh_chroma;
 
     int R = 3;
     int B = 4;
     int S = 4;
     int W = R * 2 + 1;
 
-    for (y = 0; y < dim.y + B - 1; y += S)
+    for (int y = 0; y < dim_y + B - 1; y += S)
     {
-      int tmax = T;
-      if (pl > 0) tmax = Tuv;
-
-      for (x = 0; x < dim.x + B - 1; x += S)
+      for (int x = 0; x < dim_x + B - 1; x += S)
       {
         int sx = x, sy = y;
         int bx = x, by = y;
         if (sx < R) sx = R;
         if (sy < R) sy = R;
-        if (sx > dim.x - R - B) sx = dim.x - R - B;
-        if (sy > dim.y - R - B) sy = dim.y - R - B;
-        if (bx > dim.x - B) bx = dim.x - B;
-        if (by > dim.y - B) by = dim.y - B;
+        if (sx > dim_x - R - B) sx = dim_x - R - B;
+        if (sy > dim_y - R - B) sy = dim_y - R - B;
+        if (bx > dim_x - B) bx = dim_x - B;
+        if (by > dim_y - B) by = dim_y - B;
+
+        uint8_t* dstp = dstp_orig + dstp_pitch * by + bx;
+        const uint8_t* srcp_s = srcp_orig + src_pitch * sy + sx; // cpln(sx, sy)
 
         int dev, devp, devn;
-        frcore_dev_b4_mmx(cpln(sx, sy), &dev);
+        frcore_dev_b4_mmx(srcp_s, src_pitch, &dev);
 
-        if ((P & 2)) // 2: temporal
+        // only for temporal use
+        const uint8_t* srcpn_s = nullptr;
+        const uint8_t* srcpp_s = nullptr;
+
+        if (mode_temporal)
         {
-          frcore_sad_b4_mmx(cpln(sx, sy), ppln(sx, sy), &devp);
-          frcore_sad_b4_mmx(cpln(sx, sy), npln(sx, sy), &devn);
+          srcpp_s = srcp_prev_orig + src_prev_pitch * sy + sx; // ppln(sx, sy)
+          frcore_sad_b4_mmx(srcp_s, src_pitch, srcpp_s, src_prev_pitch, &devp);
+
+          srcpn_s = srcp_next_orig + src_next_pitch * sy + sx; // npln(sx, sy)
+          frcore_sad_b4_mmx(srcp_s, src_pitch, srcpn_s, src_next_pitch, &devn);
+
           dev = std::min(dev, devn);
           dev = std::min(dev, devp);
         }
@@ -1401,107 +1378,109 @@ PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
         thresh = (thresh > tmax) ? tmax : thresh;
         if (thresh < 1) thresh = 1;
 
-        int weight;
-        if ((P & 2)) // 2: temporal
-          frcore_filter_b4r0_mmx(cpln(bx, by), cpln(bx, by), dpln(bx, by), thresh, inv_table, &weight);
-        else
-        {
-          // not temporal
-          if (sx == x && sy == y && (P & 4)) // 4: adaptive radius
-            frcore_filter_adapt_b4r3_mmx(cpln(bx, by), cpln(sx, sy), dpln(bx, by), thresh, 16 * 9, 16 * 25, inv_table, &weight);
-          else // Nothing;  adaptive overlapping (&1) ; some case of adaptive radius (4)
-            frcore_filter_b4r3_mmx(cpln(bx, by), cpln(sx, sy), dpln(bx, by), thresh, inv_table, &weight);
-        }
+        const uint8_t* srcp_b = srcp_orig + src_pitch * by + bx; // cpln(bx, by)
 
-        if ((P & 2)) // 2: temporal
-        {
+        int weight;
+        if (mode_temporal) {
+          frcore_filter_b4r0_mmx(srcp_b, src_pitch, srcp_b, src_pitch, dstp, dstp_pitch, thresh, inv_table, &weight);
+
           int k = 1;
           if (devp < thresh)
           {
             weight = get_weight(k);
-            frcore_filter_overlap_b4r3_mmx(cpln(bx, by), ppln(sx, sy), dpln(bx, by), thresh, inv_table, &weight);
+            frcore_filter_overlap_b4r3_mmx(srcp_b, src_pitch, srcpp_s, src_prev_pitch, dstp, dstp_pitch, thresh, inv_table, &weight);
             k++;
           }
 
           if (devn < thresh)
           {
             weight = get_weight(k);
-            frcore_filter_overlap_b4r3_mmx(cpln(bx, by), npln(sx, sy), dpln(bx, by), thresh, inv_table, &weight);
+            frcore_filter_overlap_b4r3_mmx(srcp_b, src_pitch, srcpn_s, src_next_pitch, dstp, dstp_pitch, thresh, inv_table, &weight);
           }
         }
+        else
+        {
+          // not temporal
+          if (sx == x && sy == y && mode_adaptive_radius)
+            frcore_filter_adapt_b4r3_mmx(srcp_b, src_pitch, srcp_s, src_pitch, dstp, dstp_pitch, thresh, 16 * 9, 16 * 25, inv_table, &weight);
+          else // Nothing or adaptive_overlapping or some case of adaptive_radius
+            frcore_filter_b4r3_mmx(srcp_b, src_pitch, srcp_s, src_pitch, dstp, dstp_pitch, thresh, inv_table, &weight);
+        }
+
       }
     }
 
-    if ((P & 1)) // 1: adaptive overlapping
-      for (y = 2; y < dim.y - B; y += S)
+    if (mode_adaptive_overlapping)
+    {
+      for (int y = 2; y < dim_y - B; y += S)
       {
-        int tmax = T;
-        if (pl > 0) tmax = Tuv;
 
         R = 1;
 
-        for (x = 2; x < dim.x - B; x += S)
+        for (int x = 2; x < dim_x - B; x += S)
         {
           int sx = x, sy = y;
           if (sx < R) sx = R;
           if (sy < R) sy = R;
-          if (sx > dim.x - R - B) sx = dim.x - R - B;
-          if (sy > dim.y - R - B) sy = dim.y - R - B;
+          if (sx > dim_x - R - B) sx = dim_x - R - B;
+          if (sy > dim_y - R - B) sy = dim_y - R - B;
 
           int dev = 10;
-          frcore_dev_b4_mmx(cpln(sx, sy), &dev);
+          const uint8_t* srcp_s = srcp_orig + src_pitch * sy + sx; // cpln(sx, sy)
+          frcore_dev_b4_mmx(srcp_s, src_pitch, &dev);
+
           int thresh = ((dev * lambda) >> 10);
           thresh = (thresh > tmax) ? tmax : thresh;
           if (thresh < 1) thresh = 1;
 
-          int weight = get_weight(1);
-          frcore_filter_diff_b4r1_mmx(cpln(x, y), cpln(sx, sy), dpln(x, y), thresh, inv_table, &weight);
+          const uint8_t* srcp_xy = srcp_orig + src_pitch * y + x; // cpln(x, y)
+          uint8_t* dstp = dstp_orig + dstp_pitch * y + x;
 
-          unsigned char* wpln_ptr = wpln.get_ptr(x / 4, y / 4);
+          int weight = get_weight(1);
+          frcore_filter_diff_b4r1_mmx(srcp_xy, src_pitch, srcp_s, src_pitch, dstp, dstp_pitch, thresh, inv_table, &weight);
+
+          unsigned char* wpln_ptr = wpln + wp_stride * (y / 4) + (x / 4);
           *wpln_ptr = clipb(weight);
         }
       }
 
-
-    int k, kk;
-    if ((P & 1)) // 1: adaptive overlapping
-      for (kk = 1; kk < 9; kk++)
+      for (int kk = 1; kk < 9; kk++)
       {
-        k = kk;
+        int k = kk;
 
-        for (y = (k / 3) + 1; y < dim.y - B; y += S)
+        for (int y = (k / 3) + 1; y < dim_y - B; y += S)
         {
-          int tmax = T;
-          if (pl > 0) tmax = Tuv;
-
           R = 2;
 
-          for (x = (k % 3) + 1; x < dim.x - B; x += S)
+          for (int x = (k % 3) + 1; x < dim_x - B; x += S)
           {
             int sx = x, sy = y;
             if (sx < R) sx = R;
             if (sy < R) sy = R;
-            if (sx > dim.x - R - B) sx = dim.x - R - B;
-            if (sy > dim.y - R - B) sy = dim.y - R - B;
+            if (sx > dim_x - R - B) sx = dim_x - R - B;
+            if (sy > dim_y - R - B) sy = dim_y - R - B;
 
-            unsigned char* wpln_ptr = wpln.get_ptr(x / 4, y / 4);
-
-            if (*wpln_ptr < P / 1000) continue;
+            unsigned char* wpln_ptr = wpln + wp_stride * (y / 4) + (x / 4);
+            if (*wpln_ptr < P1_param) continue;
 
             int dev = 10;
-            frcore_dev_b4_mmx(cpln(sx, sy), &dev);
+            const uint8_t* srcp = srcp_orig + src_pitch * sy + sx; // cpln(sx, sy)
+            frcore_dev_b4_mmx(srcp, src_pitch, &dev);
 
             int thresh = ((dev * lambda) >> 10);
             thresh = (thresh > tmax) ? tmax : thresh;
             if (thresh < 1) thresh = 1;
 
+            uint8_t* dstp = dstp_orig + dstp_pitch * y + x;
+            const uint8_t* srcp_s = srcp_orig + src_pitch * sy + sx; // cpln(sx, sy)
+            const uint8_t* srcp_xy = srcp_orig + src_pitch * y + x; // cpln(x, y)
             int weight = get_weight(k);
-            frcore_filter_overlap_b4r2_mmx(cpln(x, y), cpln(sx, sy), dpln(x, y), thresh, inv_table, &weight);
+            frcore_filter_overlap_b4r2_mmx(srcp_xy, src_pitch, srcp_s, src_pitch, dstp, dstp_pitch, thresh, inv_table, &weight);
           }
         }
 
       }
-
+    } // adaptive overlapping
   } // PLANES LOOP
 
   __asm emms
@@ -1512,11 +1491,16 @@ PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
 AvsFilter::AvsFilter(AVSValue args, IScriptEnvironment* env)
   : GenericVideoFilter(args[0].AsClip())
 {
-  lambda = (int)(args[1].AsFloat(1.1) * 1024); // 10 bit integer arithmetic
-  T = (int)(args[2].AsFloat(6) * 16);
-  Tuv = (int)(args[3].AsFloat(2) * 16);
+  lambda = (int)(args[1].AsFloat(1.1f) * 1024); // 10 bit integer arithmetic
+  // parameter "T"
+  Thresh_luma = (int)(args[2].AsFloat(6) * 16);
+  // parameter "Tuv"
+  Thresh_chroma = (int)(args[3].AsFloat(2) * 16);
+  // parameter "P"
+  const int P_param = args[4].AsInt(0);
 
-  P = args[4].AsInt(0);
+  P = P_param & 7;
+  P1_param = P == 1 ? P_param / 1000 : 0; // hidden parameter used only for adaptive overlapping
 
   // for adaptive overlapping: a number*1000 makes a weight threshold (?)
   //	P = 12*1000;
@@ -1525,14 +1509,26 @@ AvsFilter::AvsFilter(AVSValue args, IScriptEnvironment* env)
   //	P |= 2;		// temporal
   //	P |= 4;		// adaptive radius
 
-  wpln = Plane8i().alloc(vi.width / 4, vi.height / 4);
-  for (int i = 1; i < 1024; i++) inv_table[i] = (int)((1 << 15) / (double)i);
-  inv_table[1] = 32767;
+  wp_width = vi.width / 4;
+  wp_height = vi.height / 4;
+  const int ALIGN = 32;
+  wp_stride = (((wp_width)+(ALIGN)-1) & (~((ALIGN)-1)));
+  if (P & 1) // only used for adaptive
+    wpln = new uint8_t[wp_stride * wp_height];
+  else
+    wpln = nullptr;
+
+  // pre-build reciprocial table
+  for (int i = 1; i < 1024; i++) {
+    // 1/x table 1..1023 for 15 bit integer arithmetic
+    inv_table[i] = (int)((1 << 15) / (double)i);
+  }
+  inv_table[1] = 32767; // 2^15 - 1
 }
 
 AvsFilter::~AvsFilter()
 {
-  wpln.free();
+  delete[] wpln;
 }
 
 AVSValue __cdecl AvsFilter::Create(AVSValue args, void* user_data, IScriptEnvironment* env) {
