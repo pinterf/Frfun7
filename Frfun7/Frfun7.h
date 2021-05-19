@@ -43,6 +43,7 @@ int clipb(int weight) {
 
 class Plane8i {
   unsigned char* buf;
+  bool was_alloc;
   int origin_x, origin_y;
 private:
   void update_ptr()
@@ -58,22 +59,27 @@ public:
   int stride;
   unsigned char* ptr;
 
-  unsigned char* get_ptr(int x, int y) const { return buf + stride * (origin_y + y) + origin_x + x; }
+  unsigned char* get_ptr(int x, int y) const
+  {
+    const int yy = origin_y + y;
+    const int xx = origin_x + x;
+    return buf + stride * yy + xx;
+  }
 
   void set_buf(unsigned char* _buf) {
     buf = _buf;
     update_ptr();
   }
 
-  Plane8i() : buf(nullptr), origin_x(0), origin_y(0), w(0), h(0), stride(0) {
+  Plane8i() : buf(nullptr), was_alloc(false), origin_x(0), origin_y(0), w(0), h(0), stride(0) {
     update_ptr();
   };
 
   void free() {
-    if (buf) {
+    if (buf && was_alloc) {
       _aligned_free(buf);
-      buf = nullptr;
     }
+    buf = nullptr;
   }
 
   Plane8i alloc(int w, int h) {
@@ -83,7 +89,8 @@ public:
     const int ALIGN = 32;
     int aligned_w = (((w)+(ALIGN)-1) & (~((ALIGN)-1)));
     newplanebuf.stride = aligned_w;
-    newplanebuf.set_buf((unsigned char*)_aligned_malloc(stride * h, ALIGN));
+    newplanebuf.set_buf((unsigned char*)_aligned_malloc(aligned_w * h, ALIGN));
+    newplanebuf.was_alloc = true;
     return newplanebuf;
   }
 
@@ -99,6 +106,7 @@ public:
 
   Plane8i& operator=(const Plane8i& p) {
     buf = p.buf;
+    was_alloc = p.was_alloc;
     origin_x = p.origin_x;
     origin_y = p.origin_y;
     w = p.w;
