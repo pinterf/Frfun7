@@ -1,7 +1,7 @@
 ## Frfun7 ##
 
 Frfun7 is a spatial fractal denoising plugin by 
-Copyright (C) 2002-2006, 2013 by Marc Fauconneau (prunedtree)
+Copyright (C) 2002-2006, 2013 by Marc Fauconneau (prunedtree), (C)2021 Ferenc Pintér
 
 ### Usage
 ```
@@ -51,6 +51,11 @@ frfun7 (clip, float "lambda",float "T", float "Tuv", int "P")
   frfun7(lambda=1.1, T=6.0, Tuv=2.0, P=0)
   ```
 
+### Known issues
+
+P=2 (temporal) has sometimes blocky rectangular artifacts at the most top and bottom area
+Possibly is was experimental
+
 ### Links
 
 http://avisynth.nl/index.php/Frfun7
@@ -58,7 +63,8 @@ http://avisynth.nl/index.php/Frfun7
 ### History
 ```
 Version         Date            Changes
-????            2021/05/18      - Code refresh and additions by pinterf
+0.7 WIP         2021/05/20      - Source is based on a 2006/05/11 snapshot 
+                                - Code refresh and additions by pinterf
                                 - move to git: https://github.com/pinterf/Frfun7
                                 - Source to VS2019 solution
                                 - Add readme, usage based on Avisynth wiki
@@ -66,7 +72,10 @@ Version         Date            Changes
                                 - Update AviSynth headers
                                 - Add version resource
                                 - Avisynth V2.6 style plugin
-                                - Source is based on a 2006/05/11 snapshot 
+                                - Implement all mmx inline assembler as SIMD intrinsics
+                                - x64 build
+                                - fix some rounding and other issue
+
 
 2013            2013/09/04      - no longer buffers the input; yields a nice speed increase.
                                 - "P" parameter added
