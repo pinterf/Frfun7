@@ -1048,11 +1048,11 @@ AVS_FORCEINLINE void frcore_filter_overlap_b4r2or3_simd(const uint8_t* ptrr, int
   mm6 = _mm_mulhi_epi16(mm6, weight_recip);
   mm7 = _mm_mulhi_epi16(mm7, weight_recip);
 
-  // FIXME: original mmx was shifting a whole 64 bit together but there are 4x16 bit numbers here
-  mm4 = _mm_slli_epi64(mm4, 7); // psllq mm4, 7  !! psllq = _mm_slli_epi64(reg, 7) 
-  mm5 = _mm_slli_epi64(mm5, 7); // psllq mm5, 7
-  mm6 = _mm_slli_epi64(mm6, 7); // psllq mm6, 7
-  mm7 = _mm_slli_epi64(mm7, 7); // psllq mm7, 7
+  // FIXED: original mmx was shifting a whole 64 bit together but there are 4x16 bit numbers here
+  mm4 = _mm_slli_epi16(mm4, 7); // psllq mm4, 7  !! psllq = _mm_slli_epi64(reg, 7) 
+  mm5 = _mm_slli_epi16(mm5, 7); // psllq mm5, 7
+  mm6 = _mm_slli_epi16(mm6, 7); // psllq mm6, 7
+  mm7 = _mm_slli_epi16(mm7, 7); // psllq mm7, 7
 
   auto weight_lo16 = _mm_set1_epi16(prev_weight & 0xFFFF); // lower 16 bit
 
@@ -1072,7 +1072,7 @@ AVS_FORCEINLINE void frcore_filter_overlap_b4r2or3_simd(const uint8_t* ptrr, int
     psrlw	mm1, 14                       11
     psllw	mm1, 3                     11000 // 16+8? why not 16
   */
-  auto rounder_sixteen = _mm_set1_epi16(16 + 8); // FIXME: this must be 16
+  auto rounder_sixteen = _mm_set1_epi16(16); // FIXED: this must be 16
 
   simd_blend_store4(ptrb + 0 * pitchb, mm4, weight_hi16, rounder_sixteen, zero);
   simd_blend_store4(ptrb + 1 * pitchb, mm5, weight_hi16, rounder_sixteen, zero);
@@ -1475,11 +1475,11 @@ AVS_FORCEINLINE void frcore_filter_diff_b4r1_simd(const uint8_t* ptrr, int pitch
   mm6 = _mm_mulhi_epi16(mm6, weight_recip);
   mm7 = _mm_mulhi_epi16(mm7, weight_recip);
 
-  // FIXME: original mmx was shifting a whole 64 bit together but there are 4x16 bit numbers here
-  mm4 = _mm_slli_epi64(mm4, 7); // psllq mm4, 7  !! psllq = _mm_slli_epi64(reg, 7) 
-  mm5 = _mm_slli_epi64(mm5, 7); // psllq mm5, 7
-  mm6 = _mm_slli_epi64(mm6, 7); // psllq mm6, 7
-  mm7 = _mm_slli_epi64(mm7, 7); // psllq mm7, 7
+  // FIXED: original mmx was shifting a whole 64 bit together but there are 4x16 bit numbers here
+  mm4 = _mm_slli_epi16(mm4, 7); // psllq mm4, 7  !! psllq = _mm_slli_epi64(reg, 7) 
+  mm5 = _mm_slli_epi16(mm5, 7); // psllq mm5, 7
+  mm6 = _mm_slli_epi16(mm6, 7); // psllq mm6, 7
+  mm7 = _mm_slli_epi16(mm7, 7); // psllq mm7, 7
 
   auto weight_lo16 = _mm_set1_epi16(prev_weight & 0xFFFF); // lower 16 bit
 
@@ -1499,7 +1499,7 @@ AVS_FORCEINLINE void frcore_filter_diff_b4r1_simd(const uint8_t* ptrr, int pitch
     psrlw	mm1, 14                       11
     psllw	mm1, 3                     11000 // 16+8? why not 16
   */
-  auto rounder_sixteen = _mm_set1_epi16(16 + 8); // FIXME: this must be 16
+  auto rounder_sixteen = _mm_set1_epi16(16); // FIXED: this must be 16
 
   simd_blend_diff4(ptrb + 0 * pitchb, mm4, weight_hi16, rounder_sixteen, zero);
   simd_blend_diff4(ptrb + 1 * pitchb, mm5, weight_hi16, rounder_sixteen, zero);
@@ -2042,7 +2042,7 @@ AvsFilter::AvsFilter(AVSValue args, IScriptEnvironment* env)
 {
   lambda = (int)(args[1].AsFloat(1.1f) * 1024); // 10 bit integer arithmetic
   // parameter "T"
-  Thresh_luma = (int)(args[2].AsFloat(6) * 16);
+  Thresh_luma = (int)(args[2].AsFloat(6) * 16); // internal subsampling is 4x4, probably x16 covers that
   // parameter "Tuv"
   Thresh_chroma = (int)(args[3].AsFloat(2) * 16);
   // parameter "P"
@@ -2058,7 +2058,7 @@ AvsFilter::AvsFilter(AVSValue args, IScriptEnvironment* env)
   //	P |= 2;		// temporal
   //	P |= 4;		// adaptive radius
 
-  wp_width = vi.width / 4;
+  wp_width = vi.width / 4; // internal subsampling is 4
   wp_height = vi.height / 4;
   const int ALIGN = 32;
   wp_stride = (((wp_width)+(ALIGN)-1) & (~((ALIGN)-1)));
