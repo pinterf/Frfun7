@@ -6,7 +6,7 @@
 #include "emmintrin.h"
 
 #ifdef _M_X64
-// always for x64
+// 64 bit does not like inline mmx assembler code
 #define USE_SIMD
 #else
 // for 32 bit tests
@@ -135,7 +135,7 @@ AVS_FORCEINLINE void simd_check(__m128i ref01, __m128i ref23, int offset, const 
   simd_acc16(offset, rdst, rdp_aka_pitch, sad, mm4, mm5, mm6, mm7);
 }
 
-AVS_FORCEINLINE void simd_acheck(__m128i ref01, __m128i ref23, int offset, uint8_t* rdst, int rdp_aka_pitch, int& racc, int threshold,
+AVS_FORCEINLINE void simd_acheck(__m128i ref01, __m128i ref23, int offset, const uint8_t* rdst, int rdp_aka_pitch, int& racc, int threshold,
   __m128i& mm4, __m128i& mm5, __m128i& mm6, __m128i& mm7,
   int &edx_sad_summing)
 {
@@ -175,7 +175,7 @@ AVS_FORCEINLINE void simd_stor4(uint8_t* esi, __m128i& mmA, __m128i mm0_multipli
   // ((((mm1 << 2) * multiplier) >> 16 ) + 1) >> 1
   auto mm1 = mmA;
   mm1 = _mm_slli_epi16(mm1, 2);
-  mm1 = _mm_mulhi_epu16(mm1, mm0_multiplier);
+  mm1 = _mm_mulhi_epu16(mm1, mm0_multiplier); // pmulhuw, really unsigned
   mm1 = _mm_adds_epu16(mm1, mm3_rounder);
   mm1 = _mm_srli_epi16(mm1, 1);
   mm1 = _mm_packus_epi16(mm1, mm2_zero); // 4 words to 4 bytes
@@ -315,7 +315,6 @@ AVS_FORCEINLINE void frcore_filter_b4r0_simd(const uint8_t* ptrr, int pitchr, co
 }
 
 #ifndef _M_X64
-// ported to SIMD
 void frcore_filter_b4r3_mmx(const uint8_t* ptrr, int pitchr, const uint8_t* ptra, int pitcha, uint8_t* ptrb, int pitchb, int T, int* inv_table, int* weight)
 {
   ptra += -3 * pitcha - 3; // cpln(-3, -3)
@@ -651,6 +650,152 @@ void frcore_filter_adapt_b4r3_mmx(const uint8_t* ptrr, int pitchr, const uint8_t
 }
 #endif
 
+AVS_FORCEINLINE void frcore_filter_adapt_b4r3_simd(const uint8_t* ptrr, int pitchr, const uint8_t* ptra, int pitcha, uint8_t* ptrb, int pitchb, int thresh, int sThresh2, int sThresh3, int* inv_table, int* weight)
+{
+  // convert to upper left corner of the radius
+  ptra += -1 * pitcha - 3; // cpln(-3, -1)
+
+  int weight_acc = 0; // xor ecx, ecx
+
+  // reference pixels
+  auto m0 = _mm_load_si32(ptrr); // 4 bytes
+  auto m1 = _mm_load_si32(ptrr + pitchr * 1);
+  auto m2 = _mm_load_si32(ptrr + pitchr * 2);
+  auto m3 = _mm_load_si32(ptrr + pitchr * 3);
+
+  // 4x4 pixels to 2x8 bytes
+  auto ref01 = _mm_or_si128(_mm_slli_epi64(m0, 32), m1); // mm0: 2x4 = 8 bytes
+  auto ref23 = _mm_or_si128(_mm_slli_epi64(m2, 32), m3); // mm1: 2x4 = 8 bytes
+
+  // accumulators
+  // each collects 4 words (weighted sums)
+  // which will be finally scaled back and stored as 4 bytes
+  auto mm4 = _mm_setzero_si128();
+  auto mm5 = _mm_setzero_si128();
+  auto mm6 = _mm_setzero_si128();
+  auto mm7 = _mm_setzero_si128();
+
+  int edx_sad_summing = 0;
+
+  // ; -1
+  simd_acheck(ref01, ref23, 2, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+  simd_acheck(ref01, ref23, 3, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+  simd_acheck(ref01, ref23, 4, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+  ptra += pitcha; // next line
+
+  // ; 0
+  simd_acheck(ref01, ref23, 2, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+  simd_acheck(ref01, ref23, 3, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+  simd_acheck(ref01, ref23, 4, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+  ptra += pitcha; // next line
+
+  // ; +1
+  simd_acheck(ref01, ref23, 2, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+  simd_acheck(ref01, ref23, 3, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+  simd_acheck(ref01, ref23, 4, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+
+  if (edx_sad_summing >= sThresh2)
+  {
+    // Expand the search for distances not covered in the first pass
+    ptra -= 3 * pitcha; // move to -2
+
+    // ; -2
+    simd_acheck(ref01, ref23, 1, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+    simd_acheck(ref01, ref23, 2, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+    simd_acheck(ref01, ref23, 3, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+    simd_acheck(ref01, ref23, 4, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+    simd_acheck(ref01, ref23, 5, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+    ptra += pitcha; // next line
+
+    // ; -1
+    simd_acheck(ref01, ref23, 1, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+    simd_acheck(ref01, ref23, 5, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+    ptra += pitcha; // next line
+
+    // ; 0
+    simd_acheck(ref01, ref23, 1, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+    simd_acheck(ref01, ref23, 5, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+    ptra += pitcha; // next line
+
+    // ; +1
+    simd_acheck(ref01, ref23, 1, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+    simd_acheck(ref01, ref23, 5, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+    ptra += pitcha; // next line
+
+    // ; +2
+    simd_acheck(ref01, ref23, 1, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+    simd_acheck(ref01, ref23, 2, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+    simd_acheck(ref01, ref23, 3, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+    simd_acheck(ref01, ref23, 4, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+    simd_acheck(ref01, ref23, 5, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+
+    if (edx_sad_summing >= sThresh3)
+    {
+      // Expand the search for distances not covered in the first-second pass
+      ptra -= 5 * pitcha; // move to -3
+
+      // ; -3
+      simd_acheck(ref01, ref23, 0, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+      simd_acheck(ref01, ref23, 1, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+      simd_acheck(ref01, ref23, 2, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+      simd_acheck(ref01, ref23, 3, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+      simd_acheck(ref01, ref23, 4, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+      simd_acheck(ref01, ref23, 5, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+      simd_acheck(ref01, ref23, 6, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+      ptra += pitcha; // next line
+
+      // ; -2
+      simd_acheck(ref01, ref23, 0, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+      simd_acheck(ref01, ref23, 6, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+      ptra += pitcha; // next line
+
+      // ; -1
+      simd_acheck(ref01, ref23, 0, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+      simd_acheck(ref01, ref23, 6, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+      ptra += pitcha; // next line
+
+      // ; 0
+      simd_acheck(ref01, ref23, 0, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+      simd_acheck(ref01, ref23, 6, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+      ptra += pitcha; // next line
+
+      // ; +1
+      simd_acheck(ref01, ref23, 0, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+      simd_acheck(ref01, ref23, 6, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+      ptra += pitcha; // next line
+
+      // ; +2
+      simd_acheck(ref01, ref23, 0, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+      simd_acheck(ref01, ref23, 6, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+      ptra += pitcha; // next line
+
+      // ; +3
+      simd_acheck(ref01, ref23, 0, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+      simd_acheck(ref01, ref23, 1, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+      simd_acheck(ref01, ref23, 2, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+      simd_acheck(ref01, ref23, 3, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+      simd_acheck(ref01, ref23, 4, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+      simd_acheck(ref01, ref23, 5, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+      simd_acheck(ref01, ref23, 6, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7, edx_sad_summing);
+    }
+  }
+
+  // mm4 - mm7 has accumulated sum, weight is ready here
+
+  *weight = weight_acc;
+
+  auto zero = _mm_setzero_si128(); // packer zero
+  auto rounder_one = _mm_set1_epi16(1);
+
+  // scale 4 - 7 by weight
+  auto weight_recip = _mm_set1_epi16(inv_table[weight_acc]);
+
+  simd_stor4(ptrb + 0 * pitchb, mm4, weight_recip, rounder_one, zero);
+  simd_stor4(ptrb + 1 * pitchb, mm5, weight_recip, rounder_one, zero);
+  simd_stor4(ptrb + 2 * pitchb, mm6, weight_recip, rounder_one, zero);
+  simd_stor4(ptrb + 3 * pitchb, mm7, weight_recip, rounder_one, zero);
+}
+
 #ifndef _M_X64
 void frcore_filter_b4r0_mmx(const uint8_t* ptrr, int pitchr, const uint8_t* ptra, int pitcha, uint8_t* ptrb, int pitchb, int T, int* inv_table, int* weight)
 {
@@ -732,6 +877,21 @@ void frcore_filter_b4r0_mmx(const uint8_t* ptrr, int pitchr, const uint8_t* ptra
 }
 #endif
 
+AVS_FORCEINLINE void simd_blend_store4(uint8_t* esi, __m128i mmA, __m128i mm2_multiplier, __m128i mm1_rounder, __m128i mm0_zero)
+{
+  auto mm3 = _mm_unpacklo_epi8(_mm_load_si32(esi), mm0_zero);
+  // tmp= ((esi << 6) * multiplier) >> 16  ( == [esi]/1024 * multiplier)
+  // mmA = (mmA + tmp + rounder_16) / 32
+  // ((((mm1 << 2) * multiplier) >> 16 ) + 1) >> 1
+  mm3 = _mm_slli_epi16(mm3, 6);
+  mm3 = _mm_mulhi_epi16(mm3, mm2_multiplier); // pmulhw, signed
+  mmA = _mm_adds_epu16(mmA, mm3);
+  mmA = _mm_adds_epu16(mmA, mm1_rounder);
+  mmA = _mm_srli_epi16(mmA, 5);
+  mmA = _mm_packus_epi16(mmA, mm0_zero); // 4 words to 4 bytes
+  *(uint32_t*)(esi) = _mm_cvtsi128_si32(mmA);
+}
+
 #ifndef _M_X64
 
 #define	blend_store4(mmA)						\
@@ -745,6 +905,7 @@ __asm			psrlw	mmA, 5					\
 __asm			packuswb mmA, mm0				\
 __asm			movd	[esi], mmA
 
+// _mm_set1_epi16 by lsb 16 bits in mmA
 #define expand_word(mmA,mmB)				\
 __asm			movq	mmB, mmA			\
 __asm			psllq	mmA, 32				\
@@ -754,8 +915,183 @@ __asm			psllq	mmB, 16				\
 __asm			por		mmA, mmB
 #endif
 
-#ifndef _M_X64
+// used in mode_temporal
+// R is 2 or 3
+template<int R>
+AVS_FORCEINLINE void frcore_filter_overlap_b4r2or3_simd(const uint8_t* ptrr, int pitchr, const uint8_t* ptra, int pitcha, uint8_t* ptrb, int pitchb, int thresh, int* inv_table, int* weight)
+{
+  ptra += -R * pitcha - R; // cpln(-3, -3) or cpln(-2, -2)
 
+  int weight_acc = 0;
+
+  // reference pixels
+  auto m0 = _mm_load_si32(ptrr); // 4 bytes
+  auto m1 = _mm_load_si32(ptrr + pitchr * 1);
+  auto m2 = _mm_load_si32(ptrr + pitchr * 2);
+  auto m3 = _mm_load_si32(ptrr + pitchr * 3);
+
+  // 4x4 pixels to 2x8 bytes
+  auto ref01 = _mm_or_si128(_mm_slli_epi64(m0, 32), m1); // mm0: 2x4 = 8 bytes
+  auto ref23 = _mm_or_si128(_mm_slli_epi64(m2, 32), m3); // mm1: 2x4 = 8 bytes
+
+  // accumulators
+  // each collects 4 words (weighted sums)
+  // which will be finally scaled back and stored as 4 bytes
+  auto mm4 = _mm_setzero_si128();
+  auto mm5 = _mm_setzero_si128();
+  auto mm6 = _mm_setzero_si128();
+  auto mm7 = _mm_setzero_si128();
+
+  if constexpr (R >= 3)
+  {
+    // -3 // top line of y= -3..+3
+    simd_check(ref01, ref23, 0, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+    simd_check(ref01, ref23, 1, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+    simd_check(ref01, ref23, 2, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+    simd_check(ref01, ref23, 3, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+    simd_check(ref01, ref23, 4, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+    simd_check(ref01, ref23, 5, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+    simd_check(ref01, ref23, 6, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+    ptra += pitcha; // next line
+  }
+  // -2
+  simd_check(ref01, ref23, 0, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  simd_check(ref01, ref23, 1, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  simd_check(ref01, ref23, 2, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  simd_check(ref01, ref23, 3, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  simd_check(ref01, ref23, 4, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  if constexpr (R >= 3)
+  {
+    simd_check(ref01, ref23, 5, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+    simd_check(ref01, ref23, 6, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  }
+  ptra += pitcha; // next line
+
+  // -1
+  simd_check(ref01, ref23, 0, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  simd_check(ref01, ref23, 1, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  simd_check(ref01, ref23, 2, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  simd_check(ref01, ref23, 3, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  simd_check(ref01, ref23, 4, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  if constexpr (R >= 3)
+  {
+    simd_check(ref01, ref23, 5, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+    simd_check(ref01, ref23, 6, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  }
+  ptra += pitcha; // next line
+
+  //; 0
+  simd_check(ref01, ref23, 0, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  simd_check(ref01, ref23, 1, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  simd_check(ref01, ref23, 2, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  simd_check(ref01, ref23, 3, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  simd_check(ref01, ref23, 4, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  if constexpr (R >= 3)
+  {
+    simd_check(ref01, ref23, 5, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+    simd_check(ref01, ref23, 6, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  }
+  ptra += pitcha;
+
+  // +1
+  simd_check(ref01, ref23, 0, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  simd_check(ref01, ref23, 1, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  simd_check(ref01, ref23, 2, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  simd_check(ref01, ref23, 3, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  simd_check(ref01, ref23, 4, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  if constexpr (R >= 3)
+  {
+    simd_check(ref01, ref23, 5, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+    simd_check(ref01, ref23, 6, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  }
+
+  ptra += pitcha;
+  // +2
+  simd_check(ref01, ref23, 0, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  simd_check(ref01, ref23, 1, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  simd_check(ref01, ref23, 2, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  simd_check(ref01, ref23, 3, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  simd_check(ref01, ref23, 4, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  if constexpr (R >= 3)
+  {
+    simd_check(ref01, ref23, 5, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+    simd_check(ref01, ref23, 6, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  }
+
+  if constexpr (R >= 3)
+  {
+    ptra += pitcha;
+    simd_check(ref01, ref23, 0, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+    simd_check(ref01, ref23, 1, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+    simd_check(ref01, ref23, 2, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+    simd_check(ref01, ref23, 3, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+    simd_check(ref01, ref23, 4, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+    simd_check(ref01, ref23, 5, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+    simd_check(ref01, ref23, 6, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  }
+
+  // mm4 - mm7 has accumulated sum, weight is ready here
+
+  // weight variable is a multi-purpose one, here we get a 32 bit value,
+  // which is really two 16 bit words
+  // lower 16 and upper 16 bit has separate meaning
+  int prev_weight = *weight;
+
+  // write back real weight, probably a later process need it
+  *weight = weight_acc;
+
+  // scale 4 - 7 by weight and store(here with blending)
+  auto weight_recip = _mm_set1_epi16(inv_table[weight_acc]);
+
+  mm4 = _mm_mulhi_epi16(mm4, weight_recip);
+  mm5 = _mm_mulhi_epi16(mm5, weight_recip);
+  mm6 = _mm_mulhi_epi16(mm6, weight_recip);
+  mm7 = _mm_mulhi_epi16(mm7, weight_recip);
+
+  // FIXME: original mmx was shifting a whole 64 bit together but there are 4x16 bit numbers here
+  mm4 = _mm_slli_epi64(mm4, 7); // psllq mm4, 7  !! psllq = _mm_slli_epi64(reg, 7) 
+  mm5 = _mm_slli_epi64(mm5, 7); // psllq mm5, 7
+  mm6 = _mm_slli_epi64(mm6, 7); // psllq mm6, 7
+  mm7 = _mm_slli_epi64(mm7, 7); // psllq mm7, 7
+
+  auto weight_lo16 = _mm_set1_epi16(prev_weight & 0xFFFF); // lower 16 bit
+
+  mm4 = _mm_mulhi_epi16(mm4, weight_lo16);
+  mm5 = _mm_mulhi_epi16(mm5, weight_lo16);
+  mm6 = _mm_mulhi_epi16(mm6, weight_lo16);
+  mm7 = _mm_mulhi_epi16(mm7, weight_lo16);
+
+  auto weight_hi16 = _mm_set1_epi16(prev_weight >> 16); // upper 16 bit
+
+  auto zero = _mm_setzero_si128(); // packer zero mm0
+
+  /*
+    blend is >>5 inside then it would need rounder_16. and not 24 (16+8)
+    // to be change to the good one after porting
+    pcmpeqd mm1, mm1      1111111111111111
+    psrlw	mm1, 14                       11
+    psllw	mm1, 3                     11000 // 16+8? why not 16
+  */
+  auto rounder_sixteen = _mm_set1_epi16(16 + 8); // FIXME: this must be 16
+
+  simd_blend_store4(ptrb + 0 * pitchb, mm4, weight_hi16, rounder_sixteen, zero);
+  simd_blend_store4(ptrb + 1 * pitchb, mm5, weight_hi16, rounder_sixteen, zero);
+  simd_blend_store4(ptrb + 2 * pitchb, mm6, weight_hi16, rounder_sixteen, zero);
+  simd_blend_store4(ptrb + 3 * pitchb, mm7, weight_hi16, rounder_sixteen, zero);
+}
+
+AVS_FORCEINLINE void frcore_filter_overlap_b4r3_simd(const uint8_t* ptrr, int pitchr, const uint8_t* ptra, int pitcha, uint8_t* ptrb, int pitchb, int thresh, int* inv_table, int* weight)
+{
+  frcore_filter_overlap_b4r2or3_simd<3>(ptrr, pitchr, ptra, pitcha, ptrb, pitchb, thresh, inv_table, weight);
+}
+
+// used in adaptive overlapping
+AVS_FORCEINLINE void frcore_filter_overlap_b4r2_simd(const uint8_t* ptrr, int pitchr, const uint8_t* ptra, int pitcha, uint8_t* ptrb, int pitchb, int thresh, int* inv_table, int* weight)
+{
+  frcore_filter_overlap_b4r2or3_simd<2>(ptrr, pitchr, ptra, pitcha, ptrb, pitchb, thresh, inv_table, weight);
+}
+
+#ifndef _M_X64
 void frcore_filter_overlap_b4r3_mmx(const uint8_t* ptrr, int pitchr, const uint8_t* ptra, int pitcha, uint8_t* ptrb, int pitchb, int T, int* inv_table, int* weight)
 {
 
@@ -1065,6 +1401,115 @@ void frcore_filter_overlap_b4r2_mmx(const uint8_t* ptrr, int pitchr, const uint8
 }
 #endif
 
+// mmA is input/output. In simd_blend_store4 mmA in input only
+AVS_FORCEINLINE void simd_blend_diff4(uint8_t* esi, __m128i &mmA, __m128i mm2_multiplier, __m128i mm1_rounder, __m128i mm0_zero)
+{
+  auto mm3 = _mm_unpacklo_epi8(_mm_load_si32(esi), mm0_zero);
+  // tmp= ((esi << 6) * multiplier) >> 16  ( == [esi]/1024 * multiplier)
+  // mmA = (mmA + tmp + rounder_16) / 32
+  // ((((mm1 << 2) * multiplier) >> 16 ) + 1) >> 1
+  mm3 = _mm_slli_epi16(mm3, 6);
+  mm3 = _mm_mulhi_epi16(mm3, mm2_multiplier); // pmulhw, signed
+  mmA = _mm_adds_epu16(mmA, mm3);
+  mmA = _mm_adds_epu16(mmA, mm1_rounder);
+  mmA = _mm_srli_epi16(mmA, 5);
+  mmA = _mm_packus_epi16(mmA, mm0_zero); // 4 words to 4 bytes
+  *(uint32_t*)(esi) = _mm_cvtsi128_si32(mmA);
+  mmA = _mm_sad_epu8(mmA, mm3); // this is the only difference from simd_blend_store4
+}
+
+AVS_FORCEINLINE void frcore_filter_diff_b4r1_simd(const uint8_t* ptrr, int pitchr, const uint8_t* ptra, int pitcha, uint8_t* ptrb, int pitchb, int thresh, int* inv_table, int* weight)
+{
+
+  ptra += -1 * pitcha - 1; //  cpln(-1, -1)
+
+  int weight_acc = 0;
+
+  // reference pixels
+  auto m0 = _mm_load_si32(ptrr); // 4 bytes
+  auto m1 = _mm_load_si32(ptrr + pitchr * 1);
+  auto m2 = _mm_load_si32(ptrr + pitchr * 2);
+  auto m3 = _mm_load_si32(ptrr + pitchr * 3);
+
+  // 4x4 pixels to 2x8 bytes
+  auto ref01 = _mm_or_si128(_mm_slli_epi64(m0, 32), m1); // mm0: 2x4 = 8 bytes
+  auto ref23 = _mm_or_si128(_mm_slli_epi64(m2, 32), m3); // mm1: 2x4 = 8 bytes
+
+  // accumulators
+  // each collects 4 words (weighted sums)
+  // which will be finally scaled back and stored as 4 bytes
+  auto mm4 = _mm_setzero_si128();
+  auto mm5 = _mm_setzero_si128();
+  auto mm6 = _mm_setzero_si128();
+  auto mm7 = _mm_setzero_si128();
+
+  // -1
+  simd_check(ref01, ref23, 0, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  simd_check(ref01, ref23, 1, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  simd_check(ref01, ref23, 2, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  ptra += pitcha; // next line
+
+  // 0
+  simd_check(ref01, ref23, 0, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  simd_check(ref01, ref23, 1, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  simd_check(ref01, ref23, 2, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  ptra += pitcha; // next line
+
+  // 0
+  simd_check(ref01, ref23, 0, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  simd_check(ref01, ref23, 1, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+  simd_check(ref01, ref23, 2, ptra, pitcha, weight_acc, thresh, mm4, mm5, mm6, mm7);
+
+  // mm4 - mm7 has accumulated sum, weight is ready here
+
+  // weight variable is a multi-purpose one, here we get a 32 bit value,
+  // which is really two 16 bit words
+  // lower 16 and upper 16 bit has separate meaning
+  int prev_weight = *weight;
+
+  // scale 4 - 7 by weight and store(here with blending)
+  auto weight_recip = _mm_set1_epi16(inv_table[weight_acc]);
+
+  mm4 = _mm_mulhi_epi16(mm4, weight_recip);
+  mm5 = _mm_mulhi_epi16(mm5, weight_recip);
+  mm6 = _mm_mulhi_epi16(mm6, weight_recip);
+  mm7 = _mm_mulhi_epi16(mm7, weight_recip);
+
+  // FIXME: original mmx was shifting a whole 64 bit together but there are 4x16 bit numbers here
+  mm4 = _mm_slli_epi64(mm4, 7); // psllq mm4, 7  !! psllq = _mm_slli_epi64(reg, 7) 
+  mm5 = _mm_slli_epi64(mm5, 7); // psllq mm5, 7
+  mm6 = _mm_slli_epi64(mm6, 7); // psllq mm6, 7
+  mm7 = _mm_slli_epi64(mm7, 7); // psllq mm7, 7
+
+  auto weight_lo16 = _mm_set1_epi16(prev_weight & 0xFFFF); // lower 16 bit
+
+  mm4 = _mm_mulhi_epi16(mm4, weight_lo16);
+  mm5 = _mm_mulhi_epi16(mm5, weight_lo16);
+  mm6 = _mm_mulhi_epi16(mm6, weight_lo16);
+  mm7 = _mm_mulhi_epi16(mm7, weight_lo16);
+
+  auto weight_hi16 = _mm_set1_epi16(prev_weight >> 16); // upper 16 bit
+
+  auto zero = _mm_setzero_si128(); // packer zero mm0
+
+  /*
+    blend is >>5 inside then it would need rounder_16. and not 24 (16+8)
+    // to be change to the good one after porting
+    pcmpeqd mm1, mm1      1111111111111111
+    psrlw	mm1, 14                       11
+    psllw	mm1, 3                     11000 // 16+8? why not 16
+  */
+  auto rounder_sixteen = _mm_set1_epi16(16 + 8); // FIXME: this must be 16
+
+  simd_blend_diff4(ptrb + 0 * pitchb, mm4, weight_hi16, rounder_sixteen, zero);
+  simd_blend_diff4(ptrb + 1 * pitchb, mm5, weight_hi16, rounder_sixteen, zero);
+  simd_blend_diff4(ptrb + 2 * pitchb, mm6, weight_hi16, rounder_sixteen, zero);
+  simd_blend_diff4(ptrb + 3 * pitchb, mm7, weight_hi16, rounder_sixteen, zero);
+
+  *weight = _mm_cvtsi128_si32(_mm_add_epi16(_mm_add_epi16(mm4, mm5), _mm_add_epi16(mm6, mm7)));
+  // mm4, mm5, mm6, mm7 are changed, outputs are SAD
+}
+
 #ifndef _M_X64
 
 #define	blend_diff4(mmA)						\
@@ -1206,8 +1651,34 @@ void frcore_filter_diff_b4r1_mmx(const uint8_t* ptrr, int pitchr, const uint8_t*
 }
 #endif
 
+AVS_FORCEINLINE void frcore_dev_b4_simd(const uint8_t* ptra, int pitcha, int* dev)
+{
+
+  ptra += - 1; // cpln(-1, 0).ptr;
+
+  // reference pixels
+  auto m0 = _mm_load_si32(ptra + 1); // 4 bytes
+  auto m1 = _mm_load_si32(ptra + pitcha * 1 + 1);
+  auto m2 = _mm_load_si32(ptra + pitcha * 2 + 1);
+  auto m3 = _mm_load_si32(ptra + pitcha * 3 + 1);
+
+  // 4x4 pixels to 2x8 bytes
+  auto ref01 = _mm_or_si128(_mm_slli_epi64(m0, 32), m1); // mm0: 2x4 = 8 bytes
+  auto ref23 = _mm_or_si128(_mm_slli_epi64(m2, 32), m3); // mm1: 2x4 = 8 bytes
+
+  ptra += pitcha;
+
+  int sad1;
+  simd_sad16(ref01, ref23, 0, ptra, pitcha, sad1);
+
+  int sad2;
+  simd_sad16(ref01, ref23, 2, ptra, pitcha, sad2);
+
+  *dev = std::min(sad1, sad2);
+}
+
 #ifndef _M_X64
-void frcore_dev_b4_mmx(const uint8_t* srcp, int src_pitch, int* dev)
+AVS_FORCEINLINE void frcore_dev_b4_mmx(const uint8_t* srcp, int src_pitch, int* dev)
 {
 
   const uint8_t* ptra = srcp - 1; //  cpln(-1, 0).ptr;
@@ -1244,6 +1715,24 @@ void frcore_dev_b4_mmx(const uint8_t* srcp, int src_pitch, int* dev)
   }
 }
 #endif
+
+AVS_FORCEINLINE void frcore_sad_b4_simd(const uint8_t* ptra, int pitcha, const uint8_t* ptrb, int pitchb, int* sad)
+{
+  // reference pixels
+  auto m0 = _mm_load_si32(ptra); // 4 bytes
+  auto m1 = _mm_load_si32(ptra + pitcha * 1);
+  auto m2 = _mm_load_si32(ptra + pitcha * 2);
+  auto m3 = _mm_load_si32(ptra + pitcha * 3);
+
+  // 4x4 pixels to 2x8 bytes
+  auto ref01 = _mm_or_si128(_mm_slli_epi64(m0, 32), m1); // mm0: 2x4 = 8 bytes
+  auto ref23 = _mm_or_si128(_mm_slli_epi64(m2, 32), m3); // mm1: 2x4 = 8 bytes
+
+  int sad1;
+  simd_sad16(ref01, ref23, 0, ptrb, pitchb, sad1);
+
+  *sad = sad1;
+}
 
 #ifndef _M_X64
 void frcore_sad_b4_mmx(const uint8_t* ptra, int pitcha, const uint8_t* ptrb, int pitchb, int* sad)
@@ -1362,7 +1851,9 @@ PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
         const uint8_t* srcp_s = srcp_orig + src_pitch * sy + sx; // cpln(sx, sy)
 
         int dev, devp, devn;
-#ifndef _M_X64
+#ifdef USE_SIMD
+        frcore_dev_b4_simd(srcp_s, src_pitch, &dev);
+#else
         frcore_dev_b4_mmx(srcp_s, src_pitch, &dev);
 #endif
 
@@ -1373,12 +1864,16 @@ PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
         if (mode_temporal)
         {
           srcp_prev_s = srcp_prev_orig + src_prev_pitch * sy + sx; // ppln(sx, sy)
-#ifndef _M_X64
+#ifdef USE_SIMD
+          frcore_sad_b4_simd(srcp_s, src_pitch, srcp_prev_s, src_prev_pitch, &devp);
+#else
           frcore_sad_b4_mmx(srcp_s, src_pitch, srcp_prev_s, src_prev_pitch, &devp);
 #endif
 
           srcp_next_s = srcp_next_orig + src_next_pitch * sy + sx; // npln(sx, sy)
-#ifndef _M_X64
+#ifdef USE_SIMD
+          frcore_sad_b4_simd(srcp_s, src_pitch, srcp_next_s, src_next_pitch, &devn);
+#else
           frcore_sad_b4_mmx(srcp_s, src_pitch, srcp_next_s, src_next_pitch, &devn);
 #endif
 
@@ -1403,8 +1898,10 @@ PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
           int k = 1;
           if (devp < thresh)
           {
-            weight = get_weight(k);
-#ifndef _M_X64
+            weight = get_weight(k); // two 16 bit values inside
+#ifdef USE_SIMD
+            frcore_filter_overlap_b4r3_simd(srcp_b, src_pitch, srcp_prev_s, src_prev_pitch, dstp, dstp_pitch, thresh, inv_table, &weight);
+#else
             frcore_filter_overlap_b4r3_mmx(srcp_b, src_pitch, srcp_prev_s, src_prev_pitch, dstp, dstp_pitch, thresh, inv_table, &weight);
 #endif
             k++;
@@ -1412,8 +1909,10 @@ PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
 
           if (devn < thresh)
           {
-            weight = get_weight(k);
-#ifndef _M_X64
+            weight = get_weight(k); // two 16 bit values inside
+#ifdef USE_SIMD
+            frcore_filter_overlap_b4r3_simd(srcp_b, src_pitch, srcp_next_s, src_next_pitch, dstp, dstp_pitch, thresh, inv_table, &weight);
+#else
             frcore_filter_overlap_b4r3_mmx(srcp_b, src_pitch, srcp_next_s, src_next_pitch, dstp, dstp_pitch, thresh, inv_table, &weight);
 #endif
           }
@@ -1422,8 +1921,12 @@ PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
         {
           // not temporal
           if (sx == x && sy == y && mode_adaptive_radius) {
-#ifndef _M_X64
-            frcore_filter_adapt_b4r3_mmx(srcp_b, src_pitch, srcp_s, src_pitch, dstp, dstp_pitch, thresh, 16 * 9, 16 * 25, inv_table, &weight);
+            constexpr int thresh2 = 16 * 9;
+            constexpr int thresh3 = 16 * 25;
+#ifdef USE_SIMD
+            frcore_filter_adapt_b4r3_simd(srcp_b, src_pitch, srcp_s, src_pitch, dstp, dstp_pitch, thresh, thresh2, thresh3, inv_table, &weight);
+#else
+            frcore_filter_adapt_b4r3_mmx(srcp_b, src_pitch, srcp_s, src_pitch, dstp, dstp_pitch, thresh, thresh2, thresh3, inv_table, &weight);
 #endif
           }
           else {
@@ -1456,7 +1959,9 @@ PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
 
           int dev = 10;
           const uint8_t* srcp_s = srcp_orig + src_pitch * sy + sx; // cpln(sx, sy)
-#ifndef _M_X64
+#ifdef USE_SIMD
+          frcore_dev_b4_simd(srcp_s, src_pitch, &dev);
+#else
           frcore_dev_b4_mmx(srcp_s, src_pitch, &dev);
 #endif
 
@@ -1468,7 +1973,9 @@ PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
           uint8_t* dstp = dstp_orig + dstp_pitch * y + x;
 
           int weight = get_weight(1);
-#ifndef _M_X64
+#ifdef USE_SIMD
+          frcore_filter_diff_b4r1_simd(srcp_xy, src_pitch, srcp_s, src_pitch, dstp, dstp_pitch, thresh, inv_table, &weight);
+#else
           frcore_filter_diff_b4r1_mmx(srcp_xy, src_pitch, srcp_s, src_pitch, dstp, dstp_pitch, thresh, inv_table, &weight);
 #endif
 
@@ -1497,7 +2004,9 @@ PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
 
             int dev = 10;
             const uint8_t* srcp = srcp_orig + src_pitch * sy + sx; // cpln(sx, sy)
-#ifndef _M_X64
+#ifdef USE_SIMD
+            frcore_dev_b4_simd(srcp, src_pitch, &dev);
+#else
             frcore_dev_b4_mmx(srcp, src_pitch, &dev);
 #endif
 
@@ -1508,8 +2017,10 @@ PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
             uint8_t* dstp = dstp_orig + dstp_pitch * y + x;
             const uint8_t* srcp_s = srcp_orig + src_pitch * sy + sx; // cpln(sx, sy)
             const uint8_t* srcp_xy = srcp_orig + src_pitch * y + x; // cpln(x, y)
-            int weight = get_weight(k);
-#ifndef _M_X64
+            int weight = get_weight(k); // two 16 bit words inside
+#ifdef USE_SIMD
+            frcore_filter_overlap_b4r2_simd(srcp_xy, src_pitch, srcp_s, src_pitch, dstp, dstp_pitch, thresh, inv_table, &weight);
+#else
             frcore_filter_overlap_b4r2_mmx(srcp_xy, src_pitch, srcp_s, src_pitch, dstp, dstp_pitch, thresh, inv_table, &weight);
 #endif
           }
