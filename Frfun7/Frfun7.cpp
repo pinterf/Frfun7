@@ -2040,6 +2040,9 @@ PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
 AvsFilter::AvsFilter(AVSValue args, IScriptEnvironment* env)
   : GenericVideoFilter(args[0].AsClip())
 {
+  if (!vi.IsPlanar() || !vi.IsYUV() || vi.BitsPerComponent() != 8)
+    env->ThrowError("Frfun7: only 8 bit Y or YUV colorspaces are accepted.");
+
   lambda = (int)(args[1].AsFloat(1.1f) * 1024); // 10 bit integer arithmetic
   // parameter "T"
   Thresh_luma = (int)(args[2].AsFloat(6) * 16); // internal subsampling is 4x4, probably x16 covers that
