@@ -1086,6 +1086,7 @@ AVS_FORCEINLINE void frcore_filter_overlap_b4r3_simd(const uint8_t* ptrr, int pi
 }
 
 // used in adaptive overlapping
+// bottleneck in P = 1
 AVS_FORCEINLINE void frcore_filter_overlap_b4r2_simd(const uint8_t* ptrr, int pitchr, const uint8_t* ptra, int pitcha, uint8_t* ptrb, int pitchb, int thresh, int* inv_table, int* weight)
 {
   frcore_filter_overlap_b4r2or3_simd<2>(ptrr, pitchr, ptra, pitcha, ptrb, pitchb, thresh, inv_table, weight);
@@ -1768,14 +1769,14 @@ void frcore_sad_b4_mmx(const uint8_t* ptra, int pitcha, const uint8_t* ptrb, int
 }
 #endif
 
-int get_weight(int alpha)
+AVS_FORCEINLINE int get_weight(int alpha)
 {
   int a = ((alpha * (1 << 15)) / ((alpha + 1)));
   int b = ((1 << 15) / ((alpha + 1)));
   return (a << 16) | b;
 }
 
-int clipb(int weight) {
+AVS_FORCEINLINE int clipb(int weight) {
   return weight < 0 ? 0 : weight > 255 ? 255 : weight;
 }
 
@@ -1829,26 +1830,34 @@ PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
     int tmax = Thresh_luma;
     if (pl > 0) tmax = Thresh_chroma;
 
-    int R = 3;
-    int B = 4;
-    int S = 4;
-    int W = R * 2 + 1;
+    constexpr int R = 3;
+    constexpr int B = 4;
+    constexpr int S = 4;
+    constexpr int W = R * 2 + 1;
 
     for (int y = 0; y < dim_y + B - 1; y += S)
     {
+      int sy = y;
+      int by = y;
+      if (sy < R) sy = R;
+      if (sy > dim_y - R - B) sy = dim_y - R - B;
+      if (by > dim_y - B) by = dim_y - B;
+
+      uint8_t* dstp_curr_by = dstp_orig + dstp_pitch * by;
+      const uint8_t* srcp_curr_sy = srcp_orig + src_pitch * sy; // cpln(sx, sy)
+      const uint8_t* srcp_curr_by = srcp_orig + src_pitch * by; // cpln(bx, by)
+
       for (int x = 0; x < dim_x + B - 1; x += S)
       {
-        int sx = x, sy = y;
-        int bx = x, by = y;
+        int sx = x;
+        int bx = x;
         if (sx < R) sx = R;
-        if (sy < R) sy = R;
         if (sx > dim_x - R - B) sx = dim_x - R - B;
-        if (sy > dim_y - R - B) sy = dim_y - R - B;
         if (bx > dim_x - B) bx = dim_x - B;
-        if (by > dim_y - B) by = dim_y - B;
 
-        uint8_t* dstp = dstp_orig + dstp_pitch * by + bx;
-        const uint8_t* srcp_s = srcp_orig + src_pitch * sy + sx; // cpln(sx, sy)
+        uint8_t* dstp = dstp_curr_by + bx;
+        const uint8_t* srcp_s = srcp_curr_sy + sx; // cpln(sx, sy)
+        const uint8_t* srcp_b = srcp_curr_by + bx; // cpln(bx, by)
 
         int dev, devp, devn;
 #ifdef USE_SIMD
@@ -1885,7 +1894,6 @@ PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
         thresh = (thresh > tmax) ? tmax : thresh;
         if (thresh < 1) thresh = 1;
 
-        const uint8_t* srcp_b = srcp_orig + src_pitch * by + bx; // cpln(bx, by)
 
         int weight;
         if (mode_temporal) {
@@ -1946,19 +1954,24 @@ PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
     {
       for (int y = 2; y < dim_y - B; y += S)
       {
+        constexpr int R = 1;
 
-        R = 1;
+        int sy = y;
+        if (sy < R) sy = R;
+        if (sy > dim_y - R - B) sy = dim_y - R - B;
+
+        const uint8_t* srcp_curr_sy = srcp_orig + src_pitch * sy; // cpln(sx, sy)
+        const uint8_t* srcp_curr_y = srcp_orig + src_pitch * y; // cpln(x, y)
+        uint8_t* dstp_curr_y = dstp_orig + dstp_pitch * y ;
 
         for (int x = 2; x < dim_x - B; x += S)
         {
-          int sx = x, sy = y;
+          int sx = x;
           if (sx < R) sx = R;
-          if (sy < R) sy = R;
           if (sx > dim_x - R - B) sx = dim_x - R - B;
-          if (sy > dim_y - R - B) sy = dim_y - R - B;
 
           int dev = 10;
-          const uint8_t* srcp_s = srcp_orig + src_pitch * sy + sx; // cpln(sx, sy)
+          const uint8_t* srcp_s = srcp_curr_sy + sx; // cpln(sx, sy)
 #ifdef USE_SIMD
           frcore_dev_b4_simd(srcp_s, src_pitch, &dev);
 #else
@@ -1969,8 +1982,8 @@ PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
           thresh = (thresh > tmax) ? tmax : thresh;
           if (thresh < 1) thresh = 1;
 
-          const uint8_t* srcp_xy = srcp_orig + src_pitch * y + x; // cpln(x, y)
-          uint8_t* dstp = dstp_orig + dstp_pitch * y + x;
+          const uint8_t* srcp_xy = srcp_curr_y + x; // cpln(x, y)
+          uint8_t* dstp = dstp_curr_y + x;
 
           int weight = get_weight(1);
 #ifdef USE_SIMD
@@ -1985,38 +1998,43 @@ PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
 
       for (int kk = 1; kk < 9; kk++)
       {
+        constexpr int R = 2;
+
         int k = kk;
 
         for (int y = (k / 3) + 1; y < dim_y - B; y += S)
         {
-          R = 2;
+          int sy = y;
+          if (sy < R) sy = R;
+          if (sy > dim_y - R - B) sy = dim_y - R - B;
+
+          const uint8_t* srcp_curr_sy = srcp_orig + src_pitch * sy;
+          const uint8_t* srcp_curr_y = srcp_orig + src_pitch * y;
+          uint8_t* dstp_curr_y = dstp_orig + dstp_pitch * y;
 
           for (int x = (k % 3) + 1; x < dim_x - B; x += S)
           {
-            int sx = x, sy = y;
+            int sx = x;
             if (sx < R) sx = R;
-            if (sy < R) sy = R;
             if (sx > dim_x - R - B) sx = dim_x - R - B;
-            if (sy > dim_y - R - B) sy = dim_y - R - B;
 
             if (wpln[wp_stride * (y / 4) + (x / 4)] < P1_param)
               continue;
 
             int dev = 10;
-            const uint8_t* srcp = srcp_orig + src_pitch * sy + sx; // cpln(sx, sy)
+            const uint8_t* srcp_s = srcp_curr_sy + sx; // cpln(sx, sy)
 #ifdef USE_SIMD
-            frcore_dev_b4_simd(srcp, src_pitch, &dev);
+            frcore_dev_b4_simd(srcp_s, src_pitch, &dev);
 #else
-            frcore_dev_b4_mmx(srcp, src_pitch, &dev);
+            frcore_dev_b4_mmx(srcp_s, src_pitch, &dev);
 #endif
 
             int thresh = ((dev * lambda) >> 10);
             thresh = (thresh > tmax) ? tmax : thresh;
             if (thresh < 1) thresh = 1;
 
-            uint8_t* dstp = dstp_orig + dstp_pitch * y + x;
-            const uint8_t* srcp_s = srcp_orig + src_pitch * sy + sx; // cpln(sx, sy)
-            const uint8_t* srcp_xy = srcp_orig + src_pitch * y + x; // cpln(x, y)
+            uint8_t* dstp = dstp_curr_y + x;
+            const uint8_t* srcp_xy = srcp_curr_y + x; // cpln(x, y)
             int weight = get_weight(k); // two 16 bit words inside
 #ifdef USE_SIMD
             frcore_filter_overlap_b4r2_simd(srcp_xy, src_pitch, srcp_s, src_pitch, dstp, dstp_pitch, thresh, inv_table, &weight);
