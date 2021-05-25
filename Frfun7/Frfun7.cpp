@@ -2078,6 +2078,9 @@ AvsFilter::AvsFilter(AVSValue args, IScriptEnvironment* env)
   // parameter "P"
   const int P_param = args[4].AsInt(0);
 
+  if (lambda < 0)
+    env->ThrowError("Frfun7: lambda cannot be negative");
+
   if (Thresh_luma < 0 || Thresh_chroma < 0)
     env->ThrowError("Frfun7: Threshold cannot be negative");
 
