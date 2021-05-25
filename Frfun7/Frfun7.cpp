@@ -1804,6 +1804,15 @@ PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
   for (int pl = 0; pl < num_of_planes; pl++) { // PLANES LOOP
     const int plane = pl == 0 ? PLANAR_Y : (pl == 1 ? PLANAR_U : PLANAR_V);
 
+    const bool chroma = pl > 0;
+
+    if ((Thresh_luma == 0 && !chroma) || (Thresh_chroma == 0 && chroma)) {
+      // plane copy
+      env->BitBlt(df->GetWritePtr(plane), df->GetPitch(plane),
+        cf->GetReadPtr(plane), cf->GetPitch(plane), cf->GetRowSize(plane), cf->GetHeight(plane));
+      continue;
+    }
+
     const int dim_x = cf->GetRowSize(plane);
     const int dim_y = cf->GetHeight(plane);;
 
@@ -2068,6 +2077,9 @@ AvsFilter::AvsFilter(AVSValue args, IScriptEnvironment* env)
   Thresh_chroma = (int)(args[3].AsFloat(2) * 16);
   // parameter "P"
   const int P_param = args[4].AsInt(0);
+
+  if (Thresh_luma < 0 || Thresh_chroma < 0)
+    env->ThrowError("Frfun7: Threshold cannot be negative");
 
   P = P_param & 7;
   P1_param = P == 1 ? P_param / 1000 : 0; // hidden parameter used only for adaptive overlapping
