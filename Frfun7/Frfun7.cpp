@@ -5,6 +5,9 @@
 #include <algorithm>
 #include "emmintrin.h"
 
+// FIXME: This plugin does not contain C reference algorithms, requires Intel SSE2
+// since it was reconstructed from having only an inline mmx assembler.
+
 AVS_FORCEINLINE __m128i _mm_load_si32(const uint8_t* ptr) {
   return _mm_castps_si128(_mm_load_ss((const float*)(ptr)));
 }
