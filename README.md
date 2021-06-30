@@ -71,6 +71,58 @@ Possibly is was experimental
 
 http://avisynth.nl/index.php/Frfun7
 
+Build instructions
+==================
+## Visual Studio 2019: 
+
+use IDE
+
+## Windows GCC
+
+(mingw installed by msys2)
+From the 'build' folder under project root:
+
+```
+del ..\CMakeCache.txt
+cmake .. -G "MinGW Makefiles" -DENABLE_INTEL_SIMD:bool=on
+cmake --build . --config Release 
+```
+
+## Linux
+
+from the 'build' folder under project root:
+ENABLE_INTEL_SIMD is automatically off for non-x86 architectures
+Note: plugin source only supports INTEL
+
+* Clone repo and build
+  
+        git clone https://github.com/pinterf/Frfun7
+        cd Frfun7
+        cmake -B build -S .
+        cmake --build build
+
+  Useful hints:        
+   build after clean:
+
+      cmake --build build --clean-first
+
+   Force no assembler support (presently it is not valid; plugin relies on Intel assembler code inside)
+  
+    cmake -B build -S . -DENABLE_INTEL_SIMD:bool=off
+  
+ delete CMake cache
+  
+    rm build/CMakeCache.txt
+  
+* Find binaries at
+  
+        build/Frfun7/frfun7.so
+
+* Install binaries
+
+        cd build
+        sudo make install
+
 ### History
 ```
 Version         Date            Changes
