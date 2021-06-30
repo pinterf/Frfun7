@@ -25,6 +25,8 @@
 
 class AvsFilter : public GenericVideoFilter
 {
+  bool has_at_least_v8;
+
   int inv_table[1024];
   int lambda, Thresh_luma, Thresh_chroma;
   int P;

@@ -787,7 +787,7 @@ PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
     pf = child->GetFrame(n - 1, env);
     nf = child->GetFrame(n + 1, env);
   }
-  PVideoFrame df = env->NewVideoFrame(vi); // destination
+  PVideoFrame df = has_at_least_v8 ? env->NewVideoFrameP(vi, &cf) : env->NewVideoFrame(vi); // frame property support
 
   const int num_of_planes = std::min(vi.NumComponents(), 3);
   for (int pl = 0; pl < num_of_planes; pl++) { // PLANES LOOP
@@ -1011,6 +1011,10 @@ PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
 AvsFilter::AvsFilter(AVSValue args, IScriptEnvironment* env)
   : GenericVideoFilter(args[0].AsClip())
 {
+  has_at_least_v8 = true;
+  try { env->CheckVersion(8); }
+  catch (const AvisynthError&) { has_at_least_v8 = false; }
+
   if (!vi.IsPlanar() || !vi.IsYUV() || vi.BitsPerComponent() != 8)
     env->ThrowError("Frfun7: only 8 bit Y or YUV colorspaces are accepted.");
 
