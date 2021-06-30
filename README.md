@@ -14,10 +14,10 @@ frfun7 (clip, float "lambda",float "T", float "Tuv", int "P")
 
         float  lambda = 1.1
     
-            Adjust the power of the local denoising. 
+            Adjust the power of the local denoising.
 
 
-        float  T = 10.0
+        float  T = 6.0
     
             Limits the max luma denoising power for edges; 0 disables processing. 
 
@@ -41,14 +41,25 @@ frfun7 (clip, float "lambda",float "T", float "Tuv", int "P")
                     P and 2: temporal
                     P and 4: adaptive radius
             When P and 1, then P/1000 is defining an additional threshold on internal weight table, e.g. P = 12*1000 + 1
+            * 20210526, this /1000-parameter available as a separate parameter TP1
             Source dated on 2006/05/11 already contains parameter P. Probably it was disabled for rev6 release (6 days before).
 
+        int  TP1 = 0
+    
+            A threshold which affects P=1 (adaptive overlapping).
+            Introduced as a separate parameter in r0.7test. This value had to be encoded into P as TP1*1000 previously.
+            0 will always run into a final filtering part, the bigger it is, probably the more pixels it will skip. (?)
+               
+
+        int  R1 = 3
+    
+            Introduced in r0.7test, experimental. Algorith'm first pass was fixed to R1=3, now it can be set to R1=2.
 
   frfun7 with default settings:
 
   ```
   AviSource("Blah.avi")
-  frfun7(lambda=1.1, T=6.0, Tuv=2.0, P=0)
+  frfun7(lambda=1.1, T=6.0, Tuv=2.0, P=0, TP1=0, R1=3)
   ```
 
 ### Known issues
@@ -63,6 +74,10 @@ http://avisynth.nl/index.php/Frfun7
 ### History
 ```
 Version         Date            Changes
+0.7 WIP         2021/05/25      - re-enable T=0, Tuv=0 cases (unprocessed plane copy)
+                                - add experimental TP1 (default 0) a threshold for P=1 (temporal overlapping) mode
+                                - add experimental R1 (default 3, can be set to 2) first pass radius
+
 0.7 WIP         2021/05/20      - Source is based on a 2006/05/11 snapshot 
                                 - Code refresh and additions by pinterf
                                 - move to git: https://github.com/pinterf/Frfun7
@@ -75,6 +90,7 @@ Version         Date            Changes
                                 - Implement all mmx inline assembler as SIMD intrinsics
                                 - x64 build
                                 - fix some rounding and other issue
+  
 
 
 2013            2013/09/04      - no longer buffers the input; yields a nice speed increase.
