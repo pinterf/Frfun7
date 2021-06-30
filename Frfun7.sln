@@ -1,9 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 2013
-VisualStudioVersion = 12.0.21005.1
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.31205.134
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{641D1D6A-AAC5-48B3-BA97-18EC7057A25B}") = "Frfun7", "Frfun7\Frfun7.vcxproj", "{29983FF5-313E-46C2-AEA7-BCA7E546A3E3}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Frfun7", "Frfun7\Frfun7.vcxproj", "{29983FF5-313E-46C2-AEA7-BCA7E546A3E3}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -11,6 +11,8 @@ Global
 		Debug|x64 = Debug|x64
 		Release|Win32 = Release|Win32
 		Release|x64 = Release|x64
+		ReleaseClang|Win32 = ReleaseClang|Win32
+		ReleaseClang|x64 = ReleaseClang|x64
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{29983FF5-313E-46C2-AEA7-BCA7E546A3E3}.Debug|Win32.ActiveCfg = Debug|Win32
@@ -21,8 +23,15 @@ Global
 		{29983FF5-313E-46C2-AEA7-BCA7E546A3E3}.Release|Win32.Build.0 = Release|Win32
 		{29983FF5-313E-46C2-AEA7-BCA7E546A3E3}.Release|x64.ActiveCfg = Release|x64
 		{29983FF5-313E-46C2-AEA7-BCA7E546A3E3}.Release|x64.Build.0 = Release|x64
+		{29983FF5-313E-46C2-AEA7-BCA7E546A3E3}.ReleaseClang|Win32.ActiveCfg = ReleaseClang|Win32
+		{29983FF5-313E-46C2-AEA7-BCA7E546A3E3}.ReleaseClang|Win32.Build.0 = ReleaseClang|Win32
+		{29983FF5-313E-46C2-AEA7-BCA7E546A3E3}.ReleaseClang|x64.ActiveCfg = ReleaseClang|x64
+		{29983FF5-313E-46C2-AEA7-BCA7E546A3E3}.ReleaseClang|x64.Build.0 = ReleaseClang|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {17698D20-890D-47CA-ABDF-DE36F8B17C6B}
 	EndGlobalSection
 EndGlobal
