@@ -5,7 +5,7 @@ Copyright (C) 2002-2006, 2013 by Marc Fauconneau (prunedtree), (C)2021 Ferenc Pi
 
 ### Usage
 ```
-frfun7 (clip, float "lambda",float "T", float "Tuv", int "P")
+frfun7 (clip, float "lambda", float "T", float "Tuv", int "P", int "TP", int "R1")
 ```
          clip   =
     
@@ -29,31 +29,29 @@ frfun7 (clip, float "lambda",float "T", float "Tuv", int "P")
 
         int  P = 0
     
-            Undocumented parameter, only available in frfun7 2013. By testing, one can conclude it's a "speed -vs- quality" trade off setting. 
+            By testing, one can conclude it's a "speed -vs- quality" trade off setting. 
     
                     0 : faster but slightly lower quality than frfun7_rev6 (may create minor artifacts around line edges).
-                    1 : slower than frfun7_rev6 but the quality is a little bit better. 
+                    1 : adaptive overlapping (see also TP1). slower than frfun7_rev6 but the quality is a little bit better.
+                    2 : temporal
+                    4 : adaptive radius
     
-            2021 finding by pinterf: 
-            P is bit mask, plus a *1000 value for P and 1
-                    P lsb 3 bits are zero: ???
-                    P and 1: adaptive overlapping
-                    P and 2: temporal
-                    P and 4: adaptive radius
-            When P and 1, then P/1000 is defining an additional threshold on internal weight table, e.g. P = 12*1000 + 1
-            * 20210526, this /1000-parameter available as a separate parameter TP1
-            Source dated on 2006/05/11 already contains parameter P. Probably it was disabled for rev6 release (6 days before).
+            Internally the parameter is treated as a bit mask but probably it has no point.
+    
+            Parameter is available since frfun7 2013.
+
 
         int  TP1 = 0
     
             A threshold which affects P=1 (adaptive overlapping).
             Introduced as a separate parameter in r0.7test. This value had to be encoded into P as TP1*1000 previously.
             0 will always run into a final filtering part, the bigger it is, probably the more pixels it will skip. (?)
-               
 
         int  R1 = 3
     
-            Introduced in r0.7test, experimental. Algorith'm first pass was fixed to R1=3, now it can be set to R1=2.
+            Radius for first pass of the internal algorithm.
+            First pass in pre v0.7 was fixed to 3 (and was no separate parameter)
+            Valid values are 2 or 3.
 
   frfun7 with default settings:
 
@@ -65,11 +63,15 @@ frfun7 (clip, float "lambda",float "T", float "Tuv", int "P")
 ### Known issues
 
 P=2 (temporal) has sometimes blocky rectangular artifacts at the most top and bottom area
-Possibly is was experimental
 
 ### Links
 
 http://avisynth.nl/index.php/Frfun7
+
+### Other
+
+Special thanks to Reel.Deel for the testing and comparison with previous versions and maintaining the documentation at avisynth.nl.
+
 
 Build instructions
 ==================
@@ -110,10 +112,11 @@ Note: plugin source only supports INTEL
   
     cmake -B build -S . -DENABLE_INTEL_SIMD:bool=off
   
+
  delete CMake cache
-  
+
     rm build/CMakeCache.txt
-  
+
 * Find binaries at
   
         build/Frfun7/frfun7.so
@@ -126,6 +129,8 @@ Note: plugin source only supports INTEL
 ### History
 ```
 Version         Date            Changes
+0.7             2021/09/09      - release
+
 0.7 WIP         2021/05/25      - re-enable T=0, Tuv=0 cases (unprocessed plane copy)
                                 - add experimental TP1 (default 0) a threshold for P=1 (temporal overlapping) mode
                                 - add experimental R1 (default 3, can be set to 2) first pass radius
@@ -142,8 +147,6 @@ Version         Date            Changes
                                 - Implement all mmx inline assembler as SIMD intrinsics
                                 - x64 build
                                 - fix some rounding and other issue
-  
-
 
 2013            2013/09/04      - no longer buffers the input; yields a nice speed increase.
                                 - "P" parameter added
