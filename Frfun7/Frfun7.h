@@ -32,6 +32,7 @@ class AvsFilter : public GenericVideoFilter
   int P;
   int P1_param;
   int R_1stpass; // Radius of first pass, originally 3, can be 2 as well
+  int opt;
 
   uint8_t* wpln; // weight buffer videosize_x/4,videosize_y/4
   int wp_stride;
