@@ -702,15 +702,13 @@ static void frcore_filter_diff_b4r1_scalar(const uint8_t* ptrr, int pitchr, cons
 
 static void frcore_dev_b4_scalar(const uint8_t* ptra, int pitcha, int* dev)
 {
-
   ptra += - 1; // cpln(-1, 0).ptr;
-  ptra += pitcha;
 
   int sad1;
-  scalar_sad16(ptra + 1, pitcha, 0, ptra, pitcha, sad1);
+  scalar_sad16(ptra + 1, pitcha, 0, ptra + pitcha, pitcha, sad1);
 
   int sad2;
-  scalar_sad16(ptra + 1, pitcha, 2, ptra, pitcha, sad2);
+  scalar_sad16(ptra + 1, pitcha, 2, ptra + pitcha, pitcha, sad2);
 
   *dev = std::min(sad1, sad2);
 }
@@ -1341,7 +1339,9 @@ AVS_FORCEINLINE void simd_blend_diff4(uint8_t* esi, __m128i &mmA, __m128i mm2_mu
   mmA = _mm_packus_epi16(mmA, mm0_zero); // 4 words to 4 bytes
   *(uint32_t*)(esi) = _mm_cvtsi128_si32(mmA);
   mmA = _mm_sad_epu8(mmA, mm3); // this is the only difference from simd_blend_store4
+
   // but mm3 contains 4 words? and mmA contains 4 bytes? doesn't make sense. probably pack mm3 before psadbw
+  // but it doesn't seem to affect the output
 }
 
 AVS_FORCEINLINE void frcore_filter_diff_b4r1_simd(const uint8_t* ptrr, int pitchr, const uint8_t* ptra, int pitcha, uint8_t* ptrb, int pitchb, int thresh, const int* inv_table, int* weight)
