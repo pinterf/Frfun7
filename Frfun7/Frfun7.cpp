@@ -1607,25 +1607,25 @@ static void process_plane(const uint8_t* srcp_orig, int src_pitch,
     }
   }
 
-  if (mode_adaptive_overlapping)
-  {
-    for (int y = 2; y < dim_y - B; y += S)
+    if (mode_adaptive_overlapping)
     {
-      constexpr int R = 1;
+      for (int y = 2; y < dim_y - B; y += S)
+      {
+        constexpr int R_shadow = 1; // renamed from R to silence a shadow warning
 
-      int sy = y;
-      if (sy < R) sy = R;
-      if (sy > dim_y - R - B) sy = dim_y - R - B;
+        int sy = y;
+        if (sy < R_shadow) sy = R_shadow;
+        if (sy > dim_y - R_shadow - B) sy = dim_y - R_shadow - B;
 
       const uint8_t* srcp_curr_sy = srcp_orig + src_pitch * sy; // cpln(sx, sy)
       const uint8_t* srcp_curr_y = srcp_orig + src_pitch * y; // cpln(x, y)
       uint8_t* dstp_curr_y = dstp_orig + dstp_pitch * y;
 
-      for (int x = 2; x < dim_x - B; x += S)
-      {
-        int sx = x;
-        if (sx < R) sx = R;
-        if (sx > dim_x - R - B) sx = dim_x - R - B;
+        for (int x = 2; x < dim_x - B; x += S)
+        {
+          int sx = x;
+          if (sx < R_shadow) sx = R_shadow;
+          if (sx > dim_x - R_shadow - B) sx = dim_x - R_shadow - B;
 
         int dev = 10;
         const uint8_t* srcp_s = srcp_curr_sy + sx; // cpln(sx, sy)
@@ -1647,27 +1647,27 @@ static void process_plane(const uint8_t* srcp_orig, int src_pitch,
       }
     }
 
-    for (int kk = 1; kk < 9; kk++)
-    {
-      constexpr int R = 2;
+      for (int kk = 1; kk < 9; kk++)
+      {
+        constexpr int R_shadow = 2; // renamed from R to silence a shadow warning
 
       int k = kk;
 
-      for (int y = (k / 3) + 1; y < dim_y - B; y += S)
-      {
-        int sy = y;
-        if (sy < R) sy = R;
-        if (sy > dim_y - R - B) sy = dim_y - R - B;
+        for (int y = (k / 3) + 1; y < dim_y - B; y += S)
+        {
+          int sy = y;
+          if (sy < R_shadow) sy = R_shadow;
+          if (sy > dim_y - R_shadow - B) sy = dim_y - R_shadow - B;
 
         const uint8_t* srcp_curr_sy = srcp_orig + src_pitch * sy;
         const uint8_t* srcp_curr_y = srcp_orig + src_pitch * y;
         uint8_t* dstp_curr_y = dstp_orig + dstp_pitch * y;
 
-        for (int x = (k % 3) + 1; x < dim_x - B; x += S)
-        {
-          int sx = x;
-          if (sx < R) sx = R;
-          if (sx > dim_x - R - B) sx = dim_x - R - B;
+          for (int x = (k % 3) + 1; x < dim_x - B; x += S)
+          {
+            int sx = x;
+            if (sx < R_shadow) sx = R_shadow;
+            if (sx > dim_x - R_shadow - B) sx = dim_x - R_shadow - B;
 
           if (wpln[wp_stride * (y / 4) + (x / 4)] < P1_param)
             continue;
