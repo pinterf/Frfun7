@@ -18,7 +18,7 @@
 #endif
 
 
-// SAD of 2x(2x4) reference and 4x4 actual bytes
+// SAD of 4x4 reference and 4x4 actual bytes
 // return value is in sad
 static void scalar_sad16(const uint8_t *ref, int ref_pitch, int offset, const uint8_t* rdst, int rdp_aka_pitch, int &sad)
 {
@@ -105,11 +105,9 @@ static void scalar_stor4(uint8_t* esi, int mmA_array[4], int multiplier)
     for (int x = 0; x < 4; x++) {
         int mmA = mmA_array[x];
 
-        mmA = mmA << 2;
-        mmA = (mmA * multiplier) >> 16;
-        mmA = std::min(mmA + 1, 65535);
+        mmA = (mmA * multiplier) >> 14;
+        mmA = mmA + 1;
         mmA = mmA >> 1;
-        mmA = std::max(0, std::min(mmA, 255));
         esi[x] = mmA;
     }
 }
@@ -416,12 +414,10 @@ static void scalar_blend_store4(uint8_t* esi, int mmA_array[4], int mm2_multipli
         // tmp= ((esi << 6) * multiplier) >> 16  ( == [esi]/1024 * multiplier)
         // mmA = (mmA + tmp + rounder_16) / 32
 
-        mm3 = mm3 << 6;
-        mm3 = (mm3 * mm2_multiplier) >> 16; // pmulhw, signed
-        mmA = std::min(mmA + mm3, 65535);
-        mmA = std::min(mmA + 16, 65535);
+        mm3 = (mm3 * mm2_multiplier) >> 10; // pmulhw, signed
+        mmA = mmA + mm3;
+        mmA = mmA + 16;
         mmA = mmA >> 5;
-        mmA = std::max(0, std::min(mmA, 255)); // 4 words to 4 bytes
         esi[x] = mmA;
     }
 }
@@ -552,16 +548,10 @@ static void frcore_filter_overlap_b4r2or3_scalar(const uint8_t* ptrr, int pitchr
       mm6[x] = (mm6[x] * weight_recip) >> 16;
       mm7[x] = (mm7[x] * weight_recip) >> 16;
 
-      // FIXED: original mmx was shifting a whole 64 bit together but there are 4x16 bit numbers here
-      mm4[x] = mm4[x] << 7; // psllq mm4[x], 7  !! psllq = _mm_slli_epi64(reg, 7)
-      mm5[x] = mm5[x] << 7; // psllq mm5[x], 7
-      mm6[x] = mm6[x] << 7; // psllq mm6[x], 7
-      mm7[x] = mm7[x] << 7; // psllq mm7[x], 7
-
-      mm4[x] = (mm4[x] * weight_lo16) >> 16;
-      mm5[x] = (mm5[x] * weight_lo16) >> 16;
-      mm6[x] = (mm6[x] * weight_lo16) >> 16;
-      mm7[x] = (mm7[x] * weight_lo16) >> 16;
+      mm4[x] = (mm4[x] * weight_lo16) >> 9;
+      mm5[x] = (mm5[x] * weight_lo16) >> 9;
+      mm6[x] = (mm6[x] * weight_lo16) >> 9;
+      mm7[x] = (mm7[x] * weight_lo16) >> 9;
   }
 
   int weight_hi16 = prev_weight >> 16; // upper 16 bit
@@ -603,12 +593,11 @@ static void scalar_blend_diff4(uint8_t* esi, int mmA[4], int mm2_multiplier)
         // tmp= ((esi << 6) * multiplier) >> 16  ( == [esi]/1024 * multiplier)
         // mmA = (mmA + tmp + rounder_16) / 32
         // ((((mm1 << 2) * multiplier) >> 16 ) + 1) >> 1
-        mm3[x] = mm3[x] << 6;
-        mm3[x] = (mm3[x] * mm2_multiplier) >> 16; // pmulhw, signed
-        mmA[x] = std::min(mmA[x] + mm3[x], 65535);
-        mmA[x] = std::min(mmA[x] + 16, 65535);
+
+        mm3[x] = (mm3[x] * mm2_multiplier) >> 10; // pmulhw, signed
+        mmA[x] = mmA[x] + mm3[x];
+        mmA[x] = mmA[x] + 16;
         mmA[x] = mmA[x] >> 5;
-        mmA[x] = std::max(0, std::min(mmA[x], 255)); // 4 words to 4 bytes
         esi[x] = mmA[x];
     }
 
@@ -669,16 +658,10 @@ static void frcore_filter_diff_b4r1_scalar(const uint8_t* ptrr, int pitchr, cons
       mm6[x] = (mm6[x] * weight_recip) >> 16;
       mm7[x] = (mm7[x] * weight_recip) >> 16;
 
-      // FIXED: original mmx was shifting a whole 64 bit together but there are 4x16 bit numbers here
-      mm4[x] = mm4[x] << 7; // psllq mm4[x], 7  !! psllq = _mm_slli_epi64(reg, 7)
-      mm5[x] = mm5[x] << 7; // psllq mm5[x], 7
-      mm6[x] = mm6[x] << 7; // psllq mm6[x], 7
-      mm7[x] = mm7[x] << 7; // psllq mm7[x], 7
-
-      mm4[x] = (mm4[x] * weight_lo16) >> 16;
-      mm5[x] = (mm5[x] * weight_lo16) >> 16;
-      mm6[x] = (mm6[x] * weight_lo16) >> 16;
-      mm7[x] = (mm7[x] * weight_lo16) >> 16;
+      mm4[x] = (mm4[x] * weight_lo16) >> 9;
+      mm5[x] = (mm5[x] * weight_lo16) >> 9;
+      mm6[x] = (mm6[x] * weight_lo16) >> 9;
+      mm7[x] = (mm7[x] * weight_lo16) >> 9;
   }
 
   int weight_hi16 = prev_weight >> 16; // upper 16 bit
