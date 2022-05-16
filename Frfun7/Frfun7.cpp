@@ -543,15 +543,15 @@ static void frcore_filter_overlap_b4r2or3_scalar(const uint8_t* ptrr, int pitchr
   int weight_lo16 = prev_weight & 0xFFFF; // lower 16 bit
 
   for (int x = 0; x < 4; x++) {
-      mm4[x] = (mm4[x] * weight_recip) >> 16;
-      mm5[x] = (mm5[x] * weight_recip) >> 16;
-      mm6[x] = (mm6[x] * weight_recip) >> 16;
-      mm7[x] = (mm7[x] * weight_recip) >> 16;
+      mm4[x] = (mm4[x] * weight_recip + 256) >> 9;
+      mm5[x] = (mm5[x] * weight_recip + 256) >> 9;
+      mm6[x] = (mm6[x] * weight_recip + 256) >> 9;
+      mm7[x] = (mm7[x] * weight_recip + 256) >> 9;
 
-      mm4[x] = (mm4[x] * weight_lo16) >> 9;
-      mm5[x] = (mm5[x] * weight_lo16) >> 9;
-      mm6[x] = (mm6[x] * weight_lo16) >> 9;
-      mm7[x] = (mm7[x] * weight_lo16) >> 9;
+      mm4[x] = (mm4[x] * weight_lo16) >> 16;
+      mm5[x] = (mm5[x] * weight_lo16) >> 16;
+      mm6[x] = (mm6[x] * weight_lo16) >> 16;
+      mm7[x] = (mm7[x] * weight_lo16) >> 16;
   }
 
   int weight_hi16 = prev_weight >> 16; // upper 16 bit
@@ -653,15 +653,15 @@ static void frcore_filter_diff_b4r1_scalar(const uint8_t* ptrr, int pitchr, cons
   int weight_lo16 = prev_weight & 0xFFFF; // lower 16 bit
 
   for (int x = 0; x < 4; x++) {
-      mm4[x] = (mm4[x] * weight_recip) >> 16;
-      mm5[x] = (mm5[x] * weight_recip) >> 16;
-      mm6[x] = (mm6[x] * weight_recip) >> 16;
-      mm7[x] = (mm7[x] * weight_recip) >> 16;
+      mm4[x] = (mm4[x] * weight_recip + 256) >> 9;
+      mm5[x] = (mm5[x] * weight_recip + 256) >> 9;
+      mm6[x] = (mm6[x] * weight_recip + 256) >> 9;
+      mm7[x] = (mm7[x] * weight_recip + 256) >> 9;
 
-      mm4[x] = (mm4[x] * weight_lo16) >> 9;
-      mm5[x] = (mm5[x] * weight_lo16) >> 9;
-      mm6[x] = (mm6[x] * weight_lo16) >> 9;
-      mm7[x] = (mm7[x] * weight_lo16) >> 9;
+      mm4[x] = (mm4[x] * weight_lo16) >> 16;
+      mm5[x] = (mm5[x] * weight_lo16) >> 16;
+      mm6[x] = (mm6[x] * weight_lo16) >> 16;
+      mm7[x] = (mm7[x] * weight_lo16) >> 16;
   }
 
   int weight_hi16 = prev_weight >> 16; // upper 16 bit
@@ -1256,25 +1256,37 @@ AVS_FORCEINLINE void frcore_filter_overlap_b4r2or3_simd(const uint8_t* ptrr, int
   *weight = weight_acc;
 
   // scale 4 - 7 by weight and store(here with blending)
-  auto weight_recip = _mm_set1_epi16(inv_table[weight_acc]);
+  auto weight_recip = _mm_set1_epi32(inv_table[weight_acc] + (1 << 16));
 
-  mm4 = _mm_mulhi_epi16(mm4, weight_recip);
-  mm5 = _mm_mulhi_epi16(mm5, weight_recip);
-  mm6 = _mm_mulhi_epi16(mm6, weight_recip);
-  mm7 = _mm_mulhi_epi16(mm7, weight_recip);
+  mm4 = _mm_unpacklo_epi16(mm4, _mm_set1_epi16(256));
+  mm5 = _mm_unpacklo_epi16(mm5, _mm_set1_epi16(256));
+  mm6 = _mm_unpacklo_epi16(mm6, _mm_set1_epi16(256));
+  mm7 = _mm_unpacklo_epi16(mm7, _mm_set1_epi16(256));
 
-  // FIXED: original mmx was shifting a whole 64 bit together but there are 4x16 bit numbers here
-  mm4 = _mm_slli_epi16(mm4, 7); // psllq mm4, 7  !! psllq = _mm_slli_epi64(reg, 7) 
-  mm5 = _mm_slli_epi16(mm5, 7); // psllq mm5, 7
-  mm6 = _mm_slli_epi16(mm6, 7); // psllq mm6, 7
-  mm7 = _mm_slli_epi16(mm7, 7); // psllq mm7, 7
+  // We do this instead of pmulhw in order to avoid a loss of precision,
+  // which would result in a green tint (lower pixel values).
+  mm4 = _mm_madd_epi16(mm4, weight_recip);
+  mm5 = _mm_madd_epi16(mm5, weight_recip);
+  mm6 = _mm_madd_epi16(mm6, weight_recip);
+  mm7 = _mm_madd_epi16(mm7, weight_recip);
 
-  auto weight_lo16 = _mm_set1_epi16(prev_weight & 0xFFFF); // lower 16 bit
+  mm4 = _mm_srli_epi32(mm4, 9);
+  mm5 = _mm_srli_epi32(mm5, 9);
+  mm6 = _mm_srli_epi32(mm6, 9);
+  mm7 = _mm_srli_epi32(mm7, 9);
+
+  auto weight_lo16 = _mm_set1_epi32(prev_weight & 0xFFFF); // lower 16 bit
 
   mm4 = _mm_mulhi_epi16(mm4, weight_lo16);
   mm5 = _mm_mulhi_epi16(mm5, weight_lo16);
   mm6 = _mm_mulhi_epi16(mm6, weight_lo16);
   mm7 = _mm_mulhi_epi16(mm7, weight_lo16);
+
+  // Experiments show that there is no need to add, then subtract the sign bit in this case.
+  mm4 = _mm_packs_epi32(mm4, _mm_setzero_si128());
+  mm5 = _mm_packs_epi32(mm5, _mm_setzero_si128());
+  mm6 = _mm_packs_epi32(mm6, _mm_setzero_si128());
+  mm7 = _mm_packs_epi32(mm7, _mm_setzero_si128());
 
   auto weight_hi16 = _mm_set1_epi16(prev_weight >> 16); // upper 16 bit
 
@@ -1377,25 +1389,37 @@ AVS_FORCEINLINE void frcore_filter_diff_b4r1_simd(const uint8_t* ptrr, int pitch
   int prev_weight = *weight;
 
   // scale 4 - 7 by weight and store(here with blending)
-  auto weight_recip = _mm_set1_epi16(inv_table[weight_acc]);
+  auto weight_recip = _mm_set1_epi32(inv_table[weight_acc] + (1 << 16));
 
-  mm4 = _mm_mulhi_epi16(mm4, weight_recip);
-  mm5 = _mm_mulhi_epi16(mm5, weight_recip);
-  mm6 = _mm_mulhi_epi16(mm6, weight_recip);
-  mm7 = _mm_mulhi_epi16(mm7, weight_recip);
+  mm4 = _mm_unpacklo_epi16(mm4, _mm_set1_epi16(256));
+  mm5 = _mm_unpacklo_epi16(mm5, _mm_set1_epi16(256));
+  mm6 = _mm_unpacklo_epi16(mm6, _mm_set1_epi16(256));
+  mm7 = _mm_unpacklo_epi16(mm7, _mm_set1_epi16(256));
 
-  // FIXED: original mmx was shifting a whole 64 bit together but there are 4x16 bit numbers here
-  mm4 = _mm_slli_epi16(mm4, 7); // psllq mm4, 7  !! psllq = _mm_slli_epi64(reg, 7) 
-  mm5 = _mm_slli_epi16(mm5, 7); // psllq mm5, 7
-  mm6 = _mm_slli_epi16(mm6, 7); // psllq mm6, 7
-  mm7 = _mm_slli_epi16(mm7, 7); // psllq mm7, 7
+  // We do this instead of pmulhw in order to avoid a loss of precision,
+  // which would result in a green tint (lower pixel values).
+  mm4 = _mm_madd_epi16(mm4, weight_recip);
+  mm5 = _mm_madd_epi16(mm5, weight_recip);
+  mm6 = _mm_madd_epi16(mm6, weight_recip);
+  mm7 = _mm_madd_epi16(mm7, weight_recip);
 
-  auto weight_lo16 = _mm_set1_epi16(prev_weight & 0xFFFF); // lower 16 bit
+  mm4 = _mm_srli_epi32(mm4, 9);
+  mm5 = _mm_srli_epi32(mm5, 9);
+  mm6 = _mm_srli_epi32(mm6, 9);
+  mm7 = _mm_srli_epi32(mm7, 9);
+
+  auto weight_lo16 = _mm_set1_epi32(prev_weight & 0xFFFF); // lower 16 bit
 
   mm4 = _mm_mulhi_epi16(mm4, weight_lo16);
   mm5 = _mm_mulhi_epi16(mm5, weight_lo16);
   mm6 = _mm_mulhi_epi16(mm6, weight_lo16);
   mm7 = _mm_mulhi_epi16(mm7, weight_lo16);
+
+  // Experiments show that there is no need to add, then subtract the sign bit in this case.
+  mm4 = _mm_packs_epi32(mm4, _mm_setzero_si128());
+  mm5 = _mm_packs_epi32(mm5, _mm_setzero_si128());
+  mm6 = _mm_packs_epi32(mm6, _mm_setzero_si128());
+  mm7 = _mm_packs_epi32(mm7, _mm_setzero_si128());
 
   auto weight_hi16 = _mm_set1_epi16(prev_weight >> 16); // upper 16 bit
 
