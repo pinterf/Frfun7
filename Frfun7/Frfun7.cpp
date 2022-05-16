@@ -1540,9 +1540,10 @@ static void process_plane(const uint8_t* srcp_orig, int src_pitch,
     if (sy > dim_y - R - B) sy = dim_y - R - B;
     if (by > dim_y - B) by = dim_y - B;
 
-    uint8_t* dstp_curr_by = dstp_orig + dstp_pitch * by;
-    const uint8_t* srcp_curr_sy = srcp_orig + src_pitch * sy; // cpln(sx, sy)
-    const uint8_t* srcp_curr_by = srcp_orig + src_pitch * by; // cpln(bx, by)
+      uint8_t* dstp_curr_by = dstp_orig + dstp_pitch * by;
+      uint8_t* dstp_curr_sy = dstp_orig + dstp_pitch * sy;
+      const uint8_t* srcp_curr_sy = srcp_orig + src_pitch * sy; // cpln(sx, sy)
+      const uint8_t* srcp_curr_by = srcp_orig + src_pitch * by; // cpln(bx, by)
 
     for (int x = 0; x < dim_x + B - 1; x += S)
     {
@@ -1552,9 +1553,10 @@ static void process_plane(const uint8_t* srcp_orig, int src_pitch,
       if (sx > dim_x - R - B) sx = dim_x - R - B;
       if (bx > dim_x - B) bx = dim_x - B;
 
-      uint8_t* dstp = dstp_curr_by + bx;
-      const uint8_t* srcp_s = srcp_curr_sy + sx; // cpln(sx, sy)
-      const uint8_t* srcp_b = srcp_curr_by + bx; // cpln(bx, by)
+        uint8_t* dstp = dstp_curr_by + bx;
+        uint8_t* dstp_s = dstp_curr_sy + sx;
+        const uint8_t* srcp_s = srcp_curr_sy + sx; // cpln(sx, sy)
+        const uint8_t* srcp_b = srcp_curr_by + bx; // cpln(bx, by)
 
       int dev, devp, devn;
       (simd ? frcore_dev_b4_simd
@@ -1588,45 +1590,44 @@ static void process_plane(const uint8_t* srcp_orig, int src_pitch,
         (simd ? frcore_filter_b4r0_simd
           : frcore_filter_b4r0_scalar)(srcp_b, src_pitch, srcp_b, src_pitch, dstp, dstp_pitch, thresh, inv_table, &weight);
 
-        int k = 1;
-        if (devp < thresh)
-        {
-          weight = get_weight(k); // two 16 bit values inside
-          (R == 2 ? (simd ? frcore_filter_overlap_b4r2_simd
-            : frcore_filter_overlap_b4r2_scalar)
-            : (simd ? frcore_filter_overlap_b4r3_simd
-              : frcore_filter_overlap_b4r3_scalar))(srcp_b, src_pitch, srcp_prev_s, src_prev_pitch, dstp, dstp_pitch, thresh, inv_table, &weight);
-          k++;
-        }
+          int k = 1;
+          if (devp < thresh)
+          {
+            weight = get_weight(k); // two 16 bit values inside
+            (R == 2 ? (simd ? frcore_filter_overlap_b4r2_simd
+                            : frcore_filter_overlap_b4r2_scalar)
+                    : (simd ? frcore_filter_overlap_b4r3_simd
+                            : frcore_filter_overlap_b4r3_scalar))(srcp_s, src_pitch, srcp_prev_s, src_prev_pitch, dstp_s, dstp_pitch, thresh, inv_table, &weight);
+            k++;
+          }
 
-        if (devn < thresh)
+          if (devn < thresh)
+          {
+            weight = get_weight(k); // two 16 bit values inside
+            (R == 2 ? (simd ? frcore_filter_overlap_b4r2_simd
+                            : frcore_filter_overlap_b4r2_scalar)
+                    : (simd ? frcore_filter_overlap_b4r3_simd
+                            : frcore_filter_overlap_b4r3_scalar))(srcp_s, src_pitch, srcp_next_s, src_next_pitch, dstp_s, dstp_pitch, thresh, inv_table, &weight);
+          }
+        }
+        else
         {
-          weight = get_weight(k); // two 16 bit values inside
-          (R == 2 ? (simd ? frcore_filter_overlap_b4r2_simd
-            : frcore_filter_overlap_b4r2_scalar)
-            : (simd ? frcore_filter_overlap_b4r3_simd
-              : frcore_filter_overlap_b4r3_scalar))(srcp_b, src_pitch, srcp_next_s, src_next_pitch, dstp, dstp_pitch, thresh, inv_table, &weight);
+          // not temporal
+          if (sx == x && sy == y && mode_adaptive_radius) {
+            constexpr int thresh2 = 16 * 9; // First try with R=1 then if over threshold R=2 then R=3
+            constexpr int thresh3 = 16 * 25; // only when R=3
+            (R == 2 ? (simd ? frcore_filter_adapt_b4r2_simd
+                            : frcore_filter_adapt_b4r2_scalar)
+                    : (simd ? frcore_filter_adapt_b4r3_simd
+                            : frcore_filter_adapt_b4r3_scalar))(srcp_b, src_pitch, srcp_s, src_pitch, dstp, dstp_pitch, thresh, thresh2, thresh3, inv_table, &weight);
+          } else {
+            // Nothing or adaptive_overlapping or some case of adaptive_radius
+            (R == 2 ? (simd ? frcore_filter_b4r2_simd
+                            : frcore_filter_b4r2_scalar)
+                    : (simd ? frcore_filter_b4r3_simd
+                            : frcore_filter_b4r3_scalar))(srcp_b, src_pitch, srcp_s, src_pitch, dstp, dstp_pitch, thresh, inv_table, &weight);
+          }
         }
-      }
-      else
-      {
-        // not temporal
-        if (sx == x && sy == y && mode_adaptive_radius) {
-          constexpr int thresh2 = 16 * 9; // First try with R=1 then if over threshold R=2 then R=3
-          constexpr int thresh3 = 16 * 25; // only when R=3
-          (R == 2 ? (simd ? frcore_filter_adapt_b4r2_simd
-            : frcore_filter_adapt_b4r2_scalar)
-            : (simd ? frcore_filter_adapt_b4r3_simd
-              : frcore_filter_adapt_b4r3_scalar))(srcp_b, src_pitch, srcp_s, src_pitch, dstp, dstp_pitch, thresh, thresh2, thresh3, inv_table, &weight);
-        }
-        else {
-          // Nothing or adaptive_overlapping or some case of adaptive_radius
-          (R == 2 ? (simd ? frcore_filter_b4r2_simd
-            : frcore_filter_b4r2_scalar)
-            : (simd ? frcore_filter_b4r3_simd
-              : frcore_filter_b4r3_scalar))(srcp_b, src_pitch, srcp_s, src_pitch, dstp, dstp_pitch, thresh, inv_table, &weight);
-        }
-      }
 
     }
   }
