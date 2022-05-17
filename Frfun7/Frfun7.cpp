@@ -680,6 +680,7 @@ static void frcore_filter_diff_b4r1_scalar(const uint8_t* ptrr, int pitchr, cons
   scalar_blend_diff4(ptrb + 3 * pitchb, mm7, weight_hi16);
 
   *weight = mm4[0] + mm5[0] + mm6[0] + mm7[0];
+  *weight /= 16;
   // mm4, mm5, mm6, mm7 are changed, outputs are SAD
 }
 
@@ -1333,6 +1334,7 @@ AVS_FORCEINLINE void simd_blend_diff4(uint8_t* esi, __m128i &mmA, __m128i mm2_mu
   mmA = _mm_srli_epi16(mmA, 5);
   mmA = _mm_packus_epi16(mmA, mm0_zero); // 4 words to 4 bytes
   *(uint32_t*)(esi) = _mm_cvtsi128_si32(mmA);
+  mm3 = _mm_packus_epi16(mm3, mm0_zero);
   mmA = _mm_sad_epu8(mmA, mm3); // this is the only difference from simd_blend_store4
 
   // but mm3 contains 4 words? and mmA contains 4 bytes? doesn't make sense. probably pack mm3 before psadbw
@@ -1440,6 +1442,7 @@ AVS_FORCEINLINE void frcore_filter_diff_b4r1_simd(const uint8_t* ptrr, int pitch
   simd_blend_diff4(ptrb + 3 * pitchb, mm7, weight_hi16, rounder_sixteen, zero);
 
   *weight = _mm_cvtsi128_si32(_mm_add_epi16(_mm_add_epi16(mm4, mm5), _mm_add_epi16(mm6, mm7)));
+  *weight /= 16;
   // mm4, mm5, mm6, mm7 are changed, outputs are SAD
 }
 
