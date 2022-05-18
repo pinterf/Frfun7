@@ -3,20 +3,12 @@
 
 #include <math.h>
 #include <algorithm>
-#include "emmintrin.h"
 
+
+#ifdef INTEL_INTRINSICS
 #define FRFUN7_X86
-
-#ifdef FRFUN7_X86
 #include <emmintrin.h>
 #endif
-
-#ifdef _WIN32
-#define AVS_FORCEINLINE __forceinline
-#else
-#define AVS_FORCEINLINE inline __attribute__((always_inline))
-#endif
-
 
 // SAD of 4x4 reference and 4x4 actual bytes
 // return value is in sad

@@ -144,16 +144,12 @@ IF( MSVC )  # Check for Visual Studio
 
   if(ENABLE_INTEL_SIMD)
     add_definitions("/D INTEL_INTRINSICS")
-  else()
-    MESSAGE(FATAL_ERROR "Only INTEL platform supported")
   endif()
 
 ELSE()
   # other than MSVC
   if(ENABLE_INTEL_SIMD)
     SET( CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -msse2 -DINTEL_INTRINSICS" )
-  else()
-    MESSAGE(FATAL_ERROR "Only INTEL platform supported")
   endif()
   IF(WIN32)
     SET( CMAKE_SHARED_LINKER_FLAGS "-Wl,--enable-stdcall-fixup" )
