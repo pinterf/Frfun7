@@ -1757,8 +1757,8 @@ PVideoFrame __stdcall AvsFilter::GetFrame(int n, IScriptEnvironment* env)
     // prev/next: only for temporal
     const uint8_t* srcp_prev_orig = nullptr;
     const uint8_t* srcp_next_orig = nullptr;
-    int src_prev_pitch;
-    int src_next_pitch;
+    int src_prev_pitch = 0;
+    int src_next_pitch = 0;
 
     if (mode_temporal) {
       srcp_prev_orig = pf->GetReadPtr(plane);
