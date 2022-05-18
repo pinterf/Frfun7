@@ -2,6 +2,7 @@
 
 Frfun7 is a spatial fractal denoising plugin by 
 Copyright (C) 2002-2006, 2013 by Marc Fauconneau (prunedtree), (C)2021 Ferenc Pintér
+Additional work and fixes (C)2022 by dubhater.
 
 ### Usage
 ```
@@ -15,16 +16,22 @@ frfun7 (clip, float "lambda", float "T", float "Tuv", int "P", int "TP", int "R1
         float  lambda = 1.1
     
             Adjust the power of the local denoising.
+            
+            It must not be negative.
 
 
         float  T = 6.0
     
             Limits the max luma denoising power for edges; 0 disables processing. 
+            
+            It must not be negative.
 
 
         float  Tuv = 2.0
     
             Limits the max chroma denoising power for edges; 0 disables processing. 
+            
+            It must not be negative.
 
 
         int  P = 0
@@ -44,14 +51,15 @@ frfun7 (clip, float "lambda", float "T", float "Tuv", int "P", int "TP", int "R1
         int  TP1 = 0
     
             A threshold which affects P=1 (adaptive overlapping).
-            Introduced as a separate parameter in r0.7test. This value had to be encoded into P as TP1*1000 previously.
-            0 will always run into a final filtering part, the bigger it is, probably the more pixels it will skip. (?)
+            0 will always run into a final filtering part.
+            Values greater than 0 will make it skip processing some pixels.
+            (Introduced as a separate parameter in r0.7test. This value had to be encoded into P as TP1*1000 previously.)
 
         int  R1 = 3
     
             Radius for first pass of the internal algorithm.
             First pass in pre v0.7 was fixed to 3 (and was no separate parameter)
-            Valid values are 2 or 3.
+            Valid values are 2 or 3. 2 is faster.
 
   frfun7 with default settings:
 
@@ -60,13 +68,13 @@ frfun7 (clip, float "lambda", float "T", float "Tuv", int "P", int "TP", int "R1
   frfun7(lambda=1.1, T=6.0, Tuv=2.0, P=0, TP1=0, R1=3)
   ```
 
-### Known issues
-
-P=2 (temporal) has sometimes blocky rectangular artifacts at the most top and bottom area
-
 ### Links
 
 http://avisynth.nl/index.php/Frfun7
+
+VapourSynth port:
+
+https://github.com/dubhater/vapoursynth-frfun7
 
 ### Other
 
@@ -94,7 +102,7 @@ cmake --build . --config Release
 
 from the 'build' folder under project root:
 ENABLE_INTEL_SIMD is automatically off for non-x86 architectures
-Note: plugin source only supports INTEL
+Note: plugin source supports non-INTEL compilation since v0.8
 
 * Clone repo and build
   
@@ -108,9 +116,9 @@ Note: plugin source only supports INTEL
 
       cmake --build build --clean-first
 
-   Force no assembler support (presently it is not valid; plugin relies on Intel assembler code inside)
+   Force no assembler support (valid since v0.8)
   
-    cmake -B build -S . -DENABLE_INTEL_SIMD:bool=off
+      cmake -B build -S . -DENABLE_INTEL_SIMD:bool=off
   
 
  delete CMake cache
@@ -119,7 +127,7 @@ Note: plugin source only supports INTEL
 
 * Find binaries at
   
-        build/Frfun7/frfun7.so
+        build/Frfun7/libfrfun7.so
 
 * Install binaries
 
@@ -129,6 +137,12 @@ Note: plugin source only supports INTEL
 ### History
 ```
 Version         Date            Changes
+0.8             2022/05/18      - backport some fixes and non-Intel C code from VapourSynth port by dubhater:
+                                - Fix P=2 (temporal) blocky rectangular artifacts at the most top and bottom area
+                                - Fix bug when p=1 and tp1>0
+                                - Avoid loss of precision when p=1 or p=2, Fixes https://github.com/pinterf/Frfun7/issues/1
+                                - Add C-only (other than Intel SIMD) code path, enable usage of ENABLE_INTEL_SIMD build option.
+
 0.7             2021/09/09      - release
 
 0.7 WIP         2021/05/25      - re-enable T=0, Tuv=0 cases (unprocessed plane copy)
