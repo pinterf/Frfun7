@@ -621,8 +621,7 @@ static void scalar_2x_blend_diff4(uint8_t* esi, int mmA[8], int mm2_multiplier)
         // mmA = (mmA + tmp + rounder_16) / 32
         // ((((mm1 << 2) * multiplier) >> 16 ) + 1) >> 1
 
-        mm3[x] = (mm3[x] * mm2_multiplier) >> 10; // pmulhw, signed
-        mmA[x] = mmA[x] + mm3[x];
+        mmA[x] = mmA[x] + ((mm3[x] * mm2_multiplier) >> 10); // pmulhw, signed;
         mmA[x] = mmA[x] + 16;
         mmA[x] = mmA[x] >> 5;
         esi[x] = mmA[x];
@@ -1480,6 +1479,7 @@ AVS_FORCEINLINE void frcore_filter_overlap_b4r2_simd(const uint8_t* ptrr, int pi
 AVS_FORCEINLINE void simd_2x_blend_diff4(uint8_t* esi, __m128i &mmA, __m128i mm2_multiplier, __m128i mm1_rounder, __m128i mm0_zero)
 {
   auto mm3 = _mm_unpacklo_epi8(_mm_load_si64(esi), mm0_zero);
+  auto mm3_unpacked = mm3;
   // tmp= ((esi << 6) * multiplier) >> 16  ( == [esi]/1024 * multiplier)
   // mmA = (mmA + tmp + rounder_16) / 32
   // ((((mm1 << 2) * multiplier) >> 16 ) + 1) >> 1
@@ -1488,13 +1488,13 @@ AVS_FORCEINLINE void simd_2x_blend_diff4(uint8_t* esi, __m128i &mmA, __m128i mm2
   mmA = _mm_adds_epu16(mmA, mm3);
   mmA = _mm_adds_epu16(mmA, mm1_rounder);
   mmA = _mm_srli_epi16(mmA, 5);
+
+  auto mmA_unpacked = mmA;
+
   mmA = _mm_packus_epi16(mmA, mm0_zero); // 4 words to 4 bytes
   _mm_storel_epi64((__m128i *)esi, mmA);
-  mm3 = _mm_packus_epi16(mm3, mm0_zero);
-  mmA = _mm_sad_epu8(mmA, mm3); // this is the only difference from simd_blend_store4
 
-  // but mm3 contains 4 words? and mmA contains 4 bytes? doesn't make sense. probably pack mm3 before psadbw
-  // but it doesn't seem to affect the output
+  mmA = _mm_sad_epu8(mmA_unpacked, mm3_unpacked); // this is the only difference from simd_blend_store4
 }
 
 AVS_FORCEINLINE void frcore_filter_diff_b4r1_simd(const uint8_t* ptrr, int pitchr, const uint8_t* ptra, int pitcha, uint8_t* ptrb, int pitchb, int threshold[2], const int* inv_table, int weight[2])
