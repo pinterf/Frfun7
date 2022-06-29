@@ -137,6 +137,13 @@ Note: plugin source supports non-INTEL compilation since v0.8
 ### History
 ```
 Version         Date            Changes
+0.9             2022/06/29      - Performance increase in Intel sse2 - backport from VapourSynth (dubhater):
+                                  p=0 184 fps to 304 fps 65% faster
+                                  p=1  36 fps to  61 fps 69% faster
+                                  p=2 233 fps to 282 fps 21% faster
+                                  p=4 263 fps to 401 fps 52% faster
+                                  note: The output is slightly different at the left and right edges of the frame.
+                                - additional fix bug when p=1 and tp1>0
 0.8             2022/05/18      - backport some fixes and non-Intel C code from VapourSynth port by dubhater:
                                 - Fix P=2 (temporal) blocky rectangular artifacts at the most top and bottom area
                                 - Fix bug when p=1 and tp1>0
